@@ -1,22 +1,10 @@
 from functools import cache, cached_property
 import numpy as np
 import scipy as sp
-# from pymor.algorithms.lyapunov import (
-#     _chol,
-#     solve_cont_lyap_dense,
-#     solve_cont_lyap_lrcf,
-#     solve_disc_lyap_dense,
-#     solve_disc_lyap_lrcf,
-# )
-# from pymor.algorithms.riccati import solve_pos_ricc_lrcf, solve_ricc_lrcf
-# from pymor.algorithms.projection import project
-# from pymor.core.base import BasicObject
-# from pymor.models.iosys import LTIModel
-# from pymor.models.transfer_function import TransferFunction
 
 class GenericSampleGenerator(object):
     """Class to generate relevant transfer function samples (evaluations, data) for use in quadrature-based balanced truncation
-    
+    NOTE: All other Sample Generator classes (children) inherit the methods of this class!
     """
     def __init__(self, A, B, C, D):
         self.n = np.shape(A)[0]
@@ -27,11 +15,35 @@ class GenericSampleGenerator(object):
         self.B = B
         self.C = C
         self.D = D
-        # self.sl = sl
-        # self.sr = sr
-        # # Number of left and right samples 
-        # self.number_sl = np.shape(sl)[0]
-        # self.number_sr = np.shape(sr)[0]
+
+    @cache
+    def sampleG(self, s):   
+        # Artificially sample the (strictly proper part of) the transfer function of the associated LTI model
+
+        # Pre-allocate space for samples, store as 3d numpy array of dim (N, p, m)
+        # So, N blocks of p x m transfer function evals
+        Gs = np.zeros([np.shape(s)[0], self.m, self.m])
+        for j, sj in enumerate(sj):
+            Gs[j, :, :] = np.dot(self.C, np.linalg.solve((sj * self.I - self.A), self.B))
+        
+        return Gs
+    
+#    _____                 ___________________ _____ 
+#   |  _  |               | | ___ \ ___ \ ___ \_   _|
+#   | | | |_   _  __ _  __| | |_/ / |_/ / |_/ / | |  
+#   | | | | | | |/ _` |/ _` |  __/|    /| ___ \ | |  
+#   \ \/' / |_| | (_| | (_| | |   | |\ \| |_/ / | |  
+#    \_/\_\\__,_|\__,_|\__,_\_|   \_| \_\____/  \_/  
+#                                                    
+#                                                    
+#    _____                       _                   
+#   /  ___|                     | |                  
+#   \ `--.  __ _ _ __ ___  _ __ | | ___ _ __         
+#    `--. \/ _` | '_ ` _ \| '_ \| |/ _ \ '__|        
+#   /\__/ / (_| | | | | | | |_) | |  __/ |           
+#   \____/ \__,_|_| |_| |_| .__/|_|\___|_|           
+#                         | |                        
+#                         |_|                        
 
 class QuadPRBTSampler(GenericSampleGenerator):
     """Class to generate relevant transfer function samples for use in Quadrature-Based Positive-real Balanced Truncation (QuadPRBT)
@@ -79,22 +91,12 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         # :math: `M(s)` is an m x m rational transfer function 
 
-        # Get number of samples
-        number_s = np.shape(s)[0]
-        if self.m == 0: # SISO case
-            # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm 
-            Ms = np.zeros(number_s)
-            for j in range(number_s): 
-                Ms[j, :, :] = np.dot(self.C_rsf, np.linalg.solve((s[j] * self.I - self.A), self.B))
-            
-            return Ms
-        else: # MIMO case
         # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm 
-            Ms = np.zeros([number_s, self.m, self.m])
-            for j in range(number_s): 
-                Ms[j, :, :] = np.dot(self.C_rsf, np.linalg.solve((s[j] * self.I - self.A), self.B))
-            
-            return Ms
+        Ms = np.zeros([np.shape(s)[0], self.m, self.m])
+        for j, sj in enumerate(s):
+            Ms[j, :, :] = np.dot(self.C_rsf, np.linalg.solve((sj * self.I - self.A), self.B))
+        
+        return Ms
 
     @cache
     def sample_lsf(self, s):
@@ -102,22 +104,12 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         # :math: `N(s)` is an m x m rational transfer function 
 
-        # Get number of samples
-        number_s = np.shape(s)[0]
-        if self.m == 1: # SISO case
-            # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm 
-            Ns = np.zeros(number_s)
-            for j in range(number_s): 
-                Ns[j] = np.dot(np.linalg.solve(self.C, (s[j] * self.I - self.A), self.B_lsf))
+        # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm 
+        Ns = np.zeros([np.shape(s)[0], self.m, self.m])
+        for j, sj in enumerate(s):
+            Ns[j, :, :] = np.dot(np.linalg.solve(self.C, (sj * self.I - self.A), self.B_lsf))
 
-            return Ns
-        else: # MIMO case
-            # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm 
-            Ns = np.zeros([number_s, self.m, self.m])
-            for j in range(number_s): 
-                Ns[j, :, :] = np.dot(np.linalg.solve(self.C, (s[j] * self.I - self.A), self.B_lsf))
-
-            return Ns
+        return Ns
 
     @cache 
     def sample_sfcascade(self, s):
@@ -127,59 +119,106 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         # Get number of samples
         number_s = np.shape(s)[0]
-        if self.m == 1: # SISO case
-            # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm. Store as 1d numpy arra
-            Hs = np.zeros(number_s)
-            for j in range(number_s): 
-                Hs[j] = np.dot(np.linalg.solve(self.C_rsf, (s[j] * self.I - self.A), self.B_lsf))
+        # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm. Store as 3d numpy array
+        Hs = np.zeros([number_s, self.m, self.m])
+        for j in range(number_s): 
+            Hs[j, :, :] = np.dot(np.linalg.solve(self.C_rsf, (s[j] * self.I - self.A), self.B_lsf))
 
-            return Hs
-        else: # MIMO case
-            # Pre-allocate space for number_sl samples ofN(sl[j]) \in \Cmm. Store as 3d numpy array
-            Hs = np.zeros([number_s, self.m, self.m])
-            for j in range(number_s): 
-                Hs[j, :, :] = np.dot(np.linalg.solve(self.C_rsf, (s[j] * self.I - self.A), self.B_lsf))
+        return Hs
 
-            return Hs
+#    _                                         
+#   | |                                        
+#   | |     ___   _____      ___ __   ___ _ __ 
+#   | |    / _ \ / _ \ \ /\ / / '_ \ / _ \ '__|
+#   | |___| (_) |  __/\ V  V /| | | |  __/ |   
+#   \_____/\___/ \___| \_/\_/ |_| |_|\___|_|   
+#                                              
+#                                              
+#   ___  ___                                   
+#   |  \/  |                                   
+#   | .  . | __ _ _ __   __ _  __ _  ___ _ __  
+#   | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__| 
+#   | |  | | (_| | | | | (_| | (_| |  __/ |    
+#   \_|  |_/\__,_|_| |_|\__,_|\__, |\___|_|    
+#                              __/ |           
+#                             |___/                    
 
-class LoewnerManager(object):
+class BTLoewnerManager:
     """Class to generate Loewner quadruples from transfer function samples
     
     """
-    def Ls(sl, sr, Gsl, Gsr, Hermite=1):
+    def L_Ls(sl, sr, Gsl, Gsr, weightsl, weightsr, Hermite=1):
         '''
+        # TODO: Doctest!
+        Build scaled Loewner matrix L with entries defined by
+            ..math: `L[k, j, :. :] = -lscale[k] * lscale[j](Gsl[k, :, :] - Gsr[j, :, :]) ./ (sl[k] - sr[j])`
+        And scaled shifted Loewner matrix Ls with extries defined by 
+            ..math: `L[k, j, :. :] = -lscale[k] * lscale[j](sl[k] * Gsl[k, :, :] - sr[j] * Gsr[j, :, :]) ./ (sl[k] - sr[j])`
+
+        Used in building Er, Ar
+
         Parameters
         ----------
         Hermite
             Binary option (default is 1 / False) to do Hermite interpolation
-        '''
-        p = np.shape(Gsl)[1]
-        m = np.shape(Gsl)[2]
 
+        Assumptions
+        -----------
+        Gsl and Gsr are generated by the same transfer function
+        '''
+
+        # Prep data in SISO case
+        # Code below assumes tf samples are stored as 3d numpy arrays of dim (N, p, m)
+        if len(np.shape(Gsl)) == 1: 
+            Gsl = Gsl[:, np.newaxis, np.newaxis]
+        if len(np.shape(Gsr)) == 1:
+            Gsr = Gsr[:, np.newaxis, np.newaxis]
 
         if Hermite == 0:
-            Ls = np.zeros()
+            # Output of broadcast is a (Nl, Nr, p, m) np.array
+            L = Gsl[:, np.newaxis] - Gsr[np.newaxis]
+            # Now, this differ sl - sr of size (Nl, Nr) is broadcast and divided into each (p, m) `entry` of L 
+            L /= (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+            L *= -(weightsl[:, np.newaxis] - weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+            Ls = sl[np.newaxis, np.newaxis] * Gsl[:, np.newaxis] - sr[np.newaxis, np.newaxis] * Gsr[np.newaxis]
+            Ls /= (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+            Ls *= -(weightsl[:, np.newaxis] - weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+
+            # `Unpack` into 2d numpy arrays
+            L = np.concatenate(np.concatenate(L, axis=1), axis=1)
+            Ls = np.concatenate(np.concatenate(Ls, axis=1), axis=1)
+            return L, Ls
         else: # Hermite interpolation not yet implemented
             raise NotImplementedError
-        
+            
+    def g(Gsr, weightsr):
+        # TODO: Doctest!
+        # Prep data in SISO case
+        # Code below assumes tf samples are stored as 3d numpy arrays of dim (N, p, m)
+        if len(np.shape(Gsl)) == 1: 
+            Gsl = Gsl[:, np.newaxis, np.newaxis]
+        if len(np.shape(Gsr)) == 1:
+            Gsr = Gsr[:, np.newaxis, np.newaxis]
+
+        Gsr = Gsr[np.newaxis] * weightsr[np.newaxis, :, np.newaxis, np.newaxis]
+        # Gsr now a 4d numpy array: `(1 x N) matrix with (p x m) entries`
+        # `Unpack` into 2d numpy array: (p x (N * m)) matrix
+        return np.concatenate(np.concatenate(Gsr, axis=0), axis=1)
+
+    def h(Gsl, weightsl): 
+        # TODO: Doctest!
+        # Prep data in SISO case
+        # Code below assumes tf samples are stored as 3d numpy arrays of dim (N, p, m)
+        if len(np.shape(Gsl)) == 1: 
+            Gsl = Gsl[:, np.newaxis, np.newaxis]
+        if len(np.shape(Gsr)) == 1:
+            Gsr = Gsr[:, np.newaxis, np.newaxis]
+
+        Gsl = (weightsl[:, np.newaxis, np.newaxis, np.newaxis] * Gsl[:, np.newaxis])
+        # Gsl now a 4d numpy array: `(N x 1) matrix with (p x m) entries'
+        # `Unpack` into 2d numpy array: ((N * p) x m) matrix
+        return np.concatenate(np.concatenate(Gsl, axis=1), axis=1)
  
-# class GenericQuadBTReductor(BasicObject):
-#     """Reductor based on Quadrature-based Balanced Truncation (QuadBT) framework.
-    
-#     The reductor implements approximate quadrature-based balancing as in :cite: `gosea2022data`.
-    
-#     Parameters
-#     ----------
-#     quad_rule
-#         |Numpy Array| of shape ((N, 2), (N, 2)) containing left and right quadrature weights/modes or;
-#         is an integer N for computing weights and modes via the Trapezoidal rule
-#     Hs
-#         |Numpy Array| of shape (N, p, m) for MIMO systems with p outputs and m inputs or;
-#         |Numpy Array| of shape (N, ) for SISO systems where each |Numpy Array| is a scalar transfer function evaluation or;
-#         |TransferFunction| or general `model' class with `transfer_function' attribute
-#     """
-#     def __init__(self, quad_rule, ):
-#         if 
     
 def trapezoidalrule(exp_limits=np.array(-3, 3), N=400, ordering='same'):
     """Prepare quadrature modes/weights according to the composite Trapezoidal rule.
@@ -230,10 +269,4 @@ def trapezoidalrule(exp_limits=np.array(-3, 3), N=400, ordering='same'):
         return modesl, modesr, weightsl, weightsr
     else:
         raise NotImplementedError
-
-# def build_loewner():
-#     """
-#     """
-
-if __name__ == '__main__':
-    run(main)
+    
