@@ -253,6 +253,19 @@ class GeneralizedQuadBTReductor(object):
 
         return Arbar, Crbar, Brbar
 
+    def quadrature_errors(self):
+        # Return error in underlying quadrature rules
+        print("Error in Q")
+        yield np.linalg.norm(
+            self.sampler.Q
+            - np.dot(self.sampler.left_sqrt_fact_Lh.H * self.sampler.left_sqrt_fact_Lh)
+        )
+        print("Error in P")
+        yield np.linalg.norm(
+            self.sampler.P
+            - np.dot(self.sampler.right_sqrt_fact_U * self.sampler.left_sqrt_fact_U.H)
+        )
+
 
 #    _____                       _
 #   /  ___|                     | |
@@ -309,6 +322,18 @@ class QuadBTSampler(GenericSampleGenerator):
     def __init__(self, A, B, C, D):
         super().__init__(A, B, C, D)
 
+    @cached_property
+    def Q(self):
+        # Solve + cache ALE
+        #   :math: A.T * Q + Q * A + C.T * C = 0
+        return sp.linalg.solve_continuous_lyapunov(self.A.T, -self.C.T * self.C)
+
+    @cached_property
+    def P(self):
+        # Solve + cache ALE
+        #   :math: A * P + P.T * A + B *B.T = 0
+        return sp.linalg.solve_continuous_lyapunov(self.A, -self.B * self.B.T)
+
     def sample_rsf(self, s):
         return self.sampleG(s)
 
@@ -317,6 +342,30 @@ class QuadBTSampler(GenericSampleGenerator):
 
     def sample_sfcascade(self, s):
         return self.sampleG(s)
+
+    def right_sqrt_fact_U(self, sr, weightsr):
+        # Return approximate quadrature-based sqrt factor
+        #   ..math: `P \approx U * Uh,  U \in \C^{n \times (Nr * m)}`
+        # Used in checking error of the implicity quadrature rule
+        assert np.shape(sr)[0] == np.shape(weightsr)[0]
+        U = np.zeros([self.n, np.shape(sr)[0] * self.m])
+        for j, sr_j in enumerate(sr):
+            U[:, j] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B)
+
+        return U
+
+    def left_sqrt_fact_Lh(self, sl, weightsl):
+        # Return approximate quadrature-based sqrt factor
+        #   ..math: `Qprbt \approx L * Lh,  Lh \in \C^{(p * Nl) \times n}`
+        # Used in checking error of the implicity quadrature rule
+        assert np.shape(sl)[0] == np.shape(weightsl)[0]
+        Lh = np.zeros([np.shape(sl)[0] * self.p, self.n])
+        for k, sl_k in enumerate(sl):
+            Lh[k, :] = weightsl[k] * np.dot(
+                self.C, np.linalg.solve((sl_k * self.I - self.A), self.I)
+            )
+
+        return Lh
 
 
 #     _               _   _   _ ___
@@ -347,7 +396,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
             self.Rinv = np.linalg.solve(self.R, np.eye(self.n, self.n))
 
     @cached_property
-    def Qprbt(self):
+    def Q(self):
         # Solve + cache ARE
         #   :math: A.T * Qprbt + Qprbt.T * A + (C - B.T * Qprbt).T * Rinv * (C - B.T * Qprbt) = 0
         return sp.linalg.solve_continuous_are(
@@ -355,7 +404,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         )
 
     @cached_property
-    def Pprbt(self):
+    def P(self):
         # Solve + cache ARE
         #   :math: A * Pprbt + Pprbt.T * A + (Pprbt * C.T - B) * Rinv * (Pprbt * C.T - B).T = 0
         return sp.linalg.solve_continuous_are(
@@ -366,13 +415,13 @@ class QuadPRBTSampler(GenericSampleGenerator):
     def C_rsf(self):
         # Output matrix of right spectral factor (rsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
-        return np.linalg.solve(self.R_sqrt, self.C - np.dot(self.B.T, self.Qprbt))
+        return np.linalg.solve(self.R_sqrt, self.C - np.dot(self.B.T, self.Q))
 
     @cached_property
     def B_lsf(self):
         # Input matrix of left spectral factor (lsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
-        return np.linalg.solve(self.B - np.dot(self.Pprbt, self.C.T), self.R_sqrt)
+        return np.linalg.solve(self.B - np.dot(self.P, self.C.T), self.R_sqrt)
 
     # @cache
     def sample_rsf(self, sl):
@@ -396,7 +445,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Ns = np.zeros([np.shape(sr)[0], self.m, self.m])
         for j, sr_j in enumerate(sr):
-            Ns[j, :, :] = np.dot(np.linalg.solve(self.C, (sr_j * self.I - self.A), self.B_lsf))
+            Ns[j, :, :] = np.dot(self.C, np.linalg.solve((sr_j * self.I - self.A), self.B_lsf))
 
         return Ns
 
@@ -409,9 +458,33 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Hs = np.zeros([np.shape(s)[0], self.m, self.m])
         for j, sj in enumerate(s):
-            Hs[j, :, :] = np.dot(np.linalg.solve(self.C_rsf, (sj * self.I - self.A), self.B_lsf))
+            Hs[j, :, :] = np.dot(self.C_rsf, np.linalg.solve((sj * self.I - self.A), self.B_lsf))
 
         return Hs
+
+    def right_sqrt_fact_U(self, sr, weightsr):
+        # Return approximate quadrature-based sqrt factor
+        #   ..math: `Pprbt \approx U * Uh,  U \in \C^{n \times (Nr * m)}`
+        # Used in checking error of the implicity quadrature rule
+        assert np.shape(sr)[0] == np.shape(weightsr)[0]
+        U = np.zeros([self.n, np.shape(sr)[0] * self.m])
+        for j, sr_j in enumerate(sr):
+            U[:, j] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
+
+        return U
+
+    def left_sqrt_fact_Lh(self, sl, weightsl):
+        # Return approximate quadrature-based sqrt factor
+        #   ..math: `Qprbt \approx L * Lh,  Lh \in \C^{(p * Nl) \times n}`
+        # Used in checking error of the implicity quadrature rule
+        assert np.shape(sl)[0] == np.shape(weightsl)[0]
+        Lh = np.zeros([np.shape(sl)[0] * self.p, self.n])
+        for k, sl_k in enumerate(sl):
+            Lh[k, :] = weightsl[k] * np.dot(
+                self.C_rsf, np.linalg.solve((sl_k * self.I - self.A), self.I)
+            )
+
+        return Lh
 
 
 def trapezoidalrule(exp_limits=np.array((-3, 3)), N=400, ordering="same"):
