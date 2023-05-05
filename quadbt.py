@@ -64,11 +64,11 @@ class GeneralizedQuadBTReductor(object):
         assert typ in ("quadbt", "quadbrbt", "quadprbt", "quadbst", "quadfwbt")
         self.typ = typ
 
-    #                                  _                   
-    #    |   _   _       ._   _  ._   |_ ._   _  o ._   _  
-    #    |_ (_) (/_ \/\/ | | (/_ |    |_ | | (_| | | | (/_ 
-    #                                         _|           
-    
+    #                                  _
+    #    |   _   _       ._   _  ._   |_ ._   _  o ._   _
+    #    |_ (_) (/_ \/\/ | | (/_ |    |_ | | (_| | | | (/_
+    #                                         _|
+
     @staticmethod
     def _Lbar_Mbar(sl, sr, Gsl, Gsr, weightsl, weightsr, Hermite=False):
         """
@@ -254,6 +254,16 @@ class GeneralizedQuadBTReductor(object):
         return Arbar, Crbar, Brbar
 
 
+#    _____                       _
+#   /  ___|                     | |
+#   \ `--.  __ _ _ __ ___  _ __ | | ___ _ __ ___
+#    `--. \/ _` | '_ ` _ \| '_ \| |/ _ \ '__/ __|
+#   /\__/ / (_| | | | | | | |_) | |  __/ |  \__ \
+#   \____/ \__,_|_| |_| |_| .__/|_|\___|_|  |___/
+#                         | |
+#                         |_|
+
+
 class GenericSampleGenerator(object):
     """Class to generate relevant transfer function samples (evaluations, data) for use in quadrature-based balanced truncation
     NOTE: All other Sample Generator classes (children) inherit the methods of this class!
@@ -287,22 +297,10 @@ class GenericSampleGenerator(object):
         return Gs
 
 
-#    _____                 _______ _____
-#   |  _  |               | | ___ \_   _|
-#   | | | |_   _  __ _  __| | |_/ / | |
-#   | | | | | | |/ _` |/ _` | ___ \ | |
-#   \ \/' / |_| | (_| | (_| | |_/ / | |
-#    \_/\_\\__,_|\__,_|\__,_\____/  \_/
+#     _               _ ___
+#    / \      _.  _| |_) |
+#    \_X |_| (_| (_| |_) |
 #
-#
-#    _____                       _
-#   /  ___|                     | |
-#   \ `--.  __ _ _ __ ___  _ __ | | ___ _ __
-#    `--. \/ _` | '_ ` _ \| '_ \| |/ _ \ '__|
-#   /\__/ / (_| | | | | | | |_) | |  __/ |
-#   \____/ \__,_|_| |_| |_| .__/|_|\___|_|
-#                         | |
-#                         |_|
 
 
 class QuadBTSampler(GenericSampleGenerator):
@@ -321,22 +319,10 @@ class QuadBTSampler(GenericSampleGenerator):
         return self.sampleG(s)
 
 
-#    _____                 ___________________ _____
-#   |  _  |               | | ___ \ ___ \ ___ \_   _|
-#   | | | |_   _  __ _  __| | |_/ / |_/ / |_/ / | |
-#   | | | | | | |/ _` |/ _` |  __/|    /| ___ \ | |
-#   \ \/' / |_| | (_| | (_| | |   | |\ \| |_/ / | |
-#    \_/\_\\__,_|\__,_|\__,_\_|   \_| \_\____/  \_/
+#     _               _   _   _ ___
+#    / \      _.  _| |_) |_) |_) |
+#    \_X |_| (_| (_| |   | \ |_) |
 #
-#
-#    _____                       _
-#   /  ___|                     | |
-#   \ `--.  __ _ _ __ ___  _ __ | | ___ _ __
-#    `--. \/ _` | '_ ` _ \| '_ \| |/ _ \ '__|
-#   /\__/ / (_| | | | | | | |_) | |  __/ |
-#   \____/ \__,_|_| |_| |_| .__/|_|\___|_|
-#                         | |
-#                         |_|
 
 
 class QuadPRBTSampler(GenericSampleGenerator):
@@ -394,7 +380,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         # :math: `M(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Br = Lprbt.T * B
-        
+
         Ms = np.zeros([np.shape(sl)[0], self.m, self.m])
         for k, sl_k in enumerate(sl):
             Ms[k, :, :] = np.dot(self.C_rsf, np.linalg.solve((sl_k * self.I - self.A), self.B))
@@ -426,162 +412,6 @@ class QuadPRBTSampler(GenericSampleGenerator):
             Hs[j, :, :] = np.dot(np.linalg.solve(self.C_rsf, (sj * self.I - self.A), self.B_lsf))
 
         return Hs
-
-
-#    _
-#   | |
-#   | |     ___   _____      ___ __   ___ _ __
-#   | |    / _ \ / _ \ \ /\ / / '_ \ / _ \ '__|
-#   | |___| (_) |  __/\ V  V /| | | |  __/ |
-#   \_____/\___/ \___| \_/\_/ |_| |_|\___|_|
-#
-#
-#   ___  ___
-#   |  \/  |
-#   | .  . | __ _ _ __   __ _  __ _  ___ _ __
-#   | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '__|
-#   | |  | | (_| | | | | (_| | (_| |  __/ |
-#   \_|  |_/\__,_|_| |_|\__,_|\__, |\___|_|
-#                              __/ |
-#                             |___/
-
-
-def _Lbar_Mbar(sl, sr, Gsl, Gsr, weightsl, weightsr, Hermite=False):
-    """
-    # TODO: Doctests!
-    Build scaled Loewner matrix Lbar with entries defined by
-        ..math: `Lbar[k, j, :. :] = -weightsl[k] * weightsr[j](Gsl[k, :, :] - Gsr[j, :, :]) ./ (sl[k] - sr[j])`
-    And scaled shifted Loewner matrix Mbar with extries defined by
-        ..math: `Mbar[k, j, :. :] = -weightsl[k] * weightsr[j](sl[k] * Gsl[k, :, :] - sr[j] * Gsr[j, :, :]) ./ (sl[k] - sr[j])`
-
-    Lbar replaces the product of exact square-root factors (and thus its svs approximate the true hsvs) in QuadBT;
-        ..math: `Lbar = L.T * U`
-    Mbar is used in building the reduced Ar matrix in QuadBT;
-        ..math: `Mbar = L.T * A * U`
-
-    Parameters
-    ----------
-    sl
-        `Left` interpolation points (quadrature modes) as an (Nl, ) dim |Numpy Array|.
-    sr
-        `Right` interpolation point (quadrature modes) as an (Nr, ) dim |Numpy Array|.
-    Gsl
-        `Left` transfer function data as (Nl, p, m) |Numpy Array|
-    Gsr
-        `Right` transfer function dataa as (Nr, p, m) |Numpy Array|
-    weightsl
-        `Left` quadrature weights as an (Nl, ) dim |Numpy Array|.
-    weightsr
-        `Right` quadrature weights as an (Nr, ) dim |Numpy Array|.
-    Hermite
-        Binary option (default is False) to do Hermite interpolation
-        TODO: Implement this option
-
-    Returns
-    -------
-    Lbar
-        Scaled Loewner matrix as (Nl, Nr) |Numpy Array|
-    Mbar
-        Scaled shifted-Loewner matrix as (Nl, Nr) |Numpy Array|
-
-    Assumptions
-    -----------
-    Gsl and Gsr are generated by the same transfer function
-    """
-
-    # Prep data in the SISO case
-    if len(np.shape(Gsl)) == 1:
-        Gsl = Gsl[:, np.newaxis, np.newaxis]
-    if len(np.shape(Gsr)) == 1:
-        Gsr = Gsr[:, np.newaxis, np.newaxis]
-
-    if Hermite is False:
-        # Output of broadcast is a (Nl, Nr, p, m) np.array
-        Lbar = Gsl[:, np.newaxis] - Gsr[np.newaxis]
-        # Now, this differ sl - sr of size (Nl, Nr) is broadcast and divided into each (p, m) `entry` of L
-        Lbar /= (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-        Lbar *= -(weightsl[:, np.newaxis] - weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-        Mbar = (
-            sl[np.newaxis, np.newaxis] * Gsl[:, np.newaxis]
-            - sr[np.newaxis, np.newaxis] * Gsr[np.newaxis]
-        )
-        Mbar /= (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-        Mbar *= -(weightsl[:, np.newaxis] - weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-
-        # `Unpack` into 2d numpy arrays
-        Lbar = np.concatenate(np.concatenate(Lbar, axis=1), axis=1)
-        Mbar = np.concatenate(np.concatenate(Mbar, axis=1), axis=1)
-        return Lbar, Mbar
-    else:  # Hermite interpolation not yet implemented
-        raise NotImplementedError
-
-
-def _Gbar(Gsr, weightsr):
-    """
-    TODO: Doctest!
-    Build output matrix in Loewner quadruple
-        ..math: `Gbar[k, :, :] = -weightsr[k] * Gsr[k, : :]`
-    Gbar is used in constructing the reduced Cr matrix in QuadBT;
-        ..math: `Gbar = C * U`
-
-    Parameters
-    ----------
-    Gsr
-        `Right` transfer function dataa as (Nr, p, m) |Numpy Array|
-    weightsr
-        `Right` quadrature weights as an (Nr, ) dim |Numpy Array|.
-
-    Returns
-    -------
-    Gbar
-        Scaled output matrix in Loewner quadruple as (p, (Nr * m)) |Numpy Array|
-    """
-
-    # Prep data in SISO case
-    if len(np.shape(Gsl)) == 1:
-        Gsl = Gsl[:, np.newaxis, np.newaxis]
-    if len(np.shape(Gsr)) == 1:
-        Gsr = Gsr[:, np.newaxis, np.newaxis]
-
-    Gsr = Gsr[np.newaxis] * weightsr[np.newaxis, :, np.newaxis, np.newaxis]
-    # Gsr now a 4d numpy array: `(1 x Nr) matrix with (p x m) entries`
-    # `Unpack` into 2d numpy array: (p x (Nr * m)) matrix
-    return np.concatenate(np.concatenate(Gsr, axis=0), axis=1)
-
-
-def _Hbar(Gsl, weightsl):
-    """
-    TODO: Doctest!
-    Build output matrix in Loewner quadruple
-        ..math: `Hbar[j, :, :] = -weightsl[j] * Gsl[j, : :]`
-    Hbar is used in constructing the reduced Br matrix in QuadBT;
-        ..math: `Hbar = L.T * B`
-
-    Parameters
-    ----------
-    sl
-        `Left` interpolation points (quadrature modes) as an (Nl, ) dim |Numpy Array|.
-    Gsl
-        `Left` transfer function data as (Nl, p, m) |Numpy Array|
-    weightsl
-        `Left` quadrature weights as an (Nl, ) dim |Numpy Array|.
-
-    Returns
-    -------
-    Hbar
-        Scaled input matrix in Loewner quadruple as ((Nl * p), m) |Numpy Array|
-    """
-
-    # Prep data in SISO case
-    if len(np.shape(Gsl)) == 1:
-        Gsl = Gsl[:, np.newaxis, np.newaxis]
-    if len(np.shape(Gsr)) == 1:
-        Gsr = Gsr[:, np.newaxis, np.newaxis]
-
-    Gsl = weightsl[:, np.newaxis, np.newaxis, np.newaxis] * Gsl[:, np.newaxis]
-    # Gsl now a 4d numpy array: `(Nl x 1) matrix with (p x m) entries'
-    # `Unpack` into 2d numpy array: ((Nl * p) x m) matrix
-    return np.concatenate(np.concatenate(Gsl, axis=1), axis=1)
 
 
 def trapezoidalrule(exp_limits=np.array((-3, 3)), N=400, ordering="same"):
