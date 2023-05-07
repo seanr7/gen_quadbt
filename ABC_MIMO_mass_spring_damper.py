@@ -1,10 +1,11 @@
 import numpy as np
 import scipy as sp
 
-def abc_mimo_mass_spring_damper(n, m, k, d):
+
+def abc_mimo_mass_spring_damper(n, m, k, d, ph=False):
     # Created by R. Polyuga on September 03, 2008
     # Modified by R. Polyuga on February 10, 2009
-    # Modified by R. Polyuga on August 20, 2010 
+    # Modified by R. Polyuga on August 20, 2010
     # Ported from MATLAB to Python by S. Reiter on May 4, 2023
     """
     This function constructs a port-Hamiltonian representation of a mass-spring-damper system
@@ -15,23 +16,25 @@ def abc_mimo_mass_spring_damper(n, m, k, d):
 
     Parameters
     ----------
-        n 
+        n
             Integer dimension of the system (assumed to be even)
-        m   
+        m
             Mass coefficient
         d
             Damping coefficient
         k
             Spring constant
+        ph
+            Option to return in ph form, default is `False`
     Returns
     -------
         J, R, Q, B
             Port-Hamiltonian representation of the MIMO system, returned as |Numpy Arrays|
 
-        
+
     For the simplest n-dimensional MIMO mass-spring-damper system (n is even)
     with inputs (u1, u2) = (F1, F2) being the forces applied to the first
-    two masses m1 and m2 
+    two masses m1 and m2
     and outputs (y1, y2) = (v1, v2) = (p1/m1, p2/m2) being the velocities
     of the first 2 masses m1 and m2.
     The state vector is x = [q1, p1, q2, p2, ..., q_(n/2), p_(n/2)]^T
@@ -73,7 +76,7 @@ def abc_mimo_mass_spring_damper(n, m, k, d):
         0     1
     """
     if n % 2 == 0:
-        # TODO: Variable coefficients 
+        # TODO: Variable coefficients
         # Store physical parameters as numpy arrays
         M = m * np.ones(n // 2)
         D = d * np.ones(n // 2)
@@ -83,7 +86,7 @@ def abc_mimo_mass_spring_damper(n, m, k, d):
         Q = np.zeros([n, n])
         Q[0, 0] = K[1]
         for i, mi in enumerate(M):
-            # Diagonals 
+            # Diagonals
             if i != 0:
                 Q[2 * i, 2 * i] = K[i - 1] + K[i]
             Q[(2 * i) + 1, (2 * i) + 1] = 1 / M[i]
@@ -108,8 +111,13 @@ def abc_mimo_mass_spring_damper(n, m, k, d):
         B[1, 0] = 1
         if n >= 4:
             B[3, 1] = 1
-        
-        return J, R, Q, B
+
+        if ph is True:
+            return J, R, Q, B
+        else:
+            A = (J - R) @ Q
+            C = B.T @ Q
+            return A, B, C
 
     else:
-        raise ValueError('System must be Port-Hamiltonian')
+        raise ValueError("System must be Port-Hamiltonian")

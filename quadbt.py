@@ -242,6 +242,11 @@ class GeneralizedQuadBTReductor(object):
         Zbar, sbar, Yhbar = np.linalg.svd(self.Lbar, full_matrices=False)
         return Zbar, sbar, Yhbar.conj().T
 
+    def hsvbar(self):
+        # Return cached approximate hsvs, for easier reference
+        _, sbar, _ = self.svd_from_data
+        return sbar
+
     def reduce(self, r):
         # Compute SVD of Loewner matrix L
         Zbar, sbar, Ybar = self.svd_from_data
