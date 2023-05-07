@@ -305,13 +305,14 @@ class GenericSampleGenerator(object):
         else:
             self.p = 1
             C = C[np.newaxis]
+        if len(np.shape(D)) != 2:
+            raise ValueError("D must be a 2d numpy array")
         self.I = np.eye(self.n)
         self.A = A
         self.B = B
         self.C = C
         self.D = D
 
-    # @cache
     def sampleG(self, s):
         # Artificially sample the (strictly proper part of) the transfer function of the associated LTI model
 
@@ -379,14 +380,15 @@ class QuadBTSampler(GenericSampleGenerator):
         #   :math: A * P + P.T * A + B *B.T = 0
         return sp.linalg.solve_continuous_lyapunov(self.A, -self.B * self.B.T)
 
-    def B_lsf(self):
-        # Return input matrix B as self.B_lsf. For use in checking quadrature error
-        return self.B
-
     def C_rsf(self):
         # Return output matrix C as self.C_rsf. For use in checkig quadrature error
         return self.C
 
+    def B_lsf(self):
+        # Return input matrix B as self.B_lsf. For use in checking quadrature error
+        return self.B
+
+    # Return samples of G from method of parent class
     def sample_rsf(self, s):
         return self.sampleG(s)
 
@@ -492,6 +494,12 @@ class QuadPRBTSampler(GenericSampleGenerator):
             Hs[j, :, :] = self.C_rsf @ np.linalg.solve((sj * self.I - self.A), self.B_lsf)
 
         return Hs
+
+
+#     _               _   __ ___
+#    / \      _.  _| |_) (_   |
+#    \_X |_| (_| (_| |_) __)  |
+#
 
 
 def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=200, ordering="interlace"):
