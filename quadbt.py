@@ -257,11 +257,11 @@ class GeneralizedQuadBTReductor(object):
         # Return error in underlying quadrature rules
         print("Relative Error in Q")
         Lh = self.sampler.left_sqrt_fact_Lh(self.modesl, self.weightsl)
-        yield np.linalg.norm(self.sampler.Q - (Lh.conj().T @ Lh)) / np.linalg.norm(self.sampler.Q)
+        yield np.linalg.norm(self.sampler.Q - (Lh.conj().T @ Lh), 2) / np.linalg.norm(self.sampler.Q, 2)
 
         U = self.sampler.right_sqrt_fact_U(self.modesr, self.weightsr)
         print("Relative Error in P")
-        yield np.linalg.norm(self.sampler.P - (U @ U.conj().T)) / np.linalg.norm(self.sampler.P)
+        yield np.linalg.norm(self.sampler.P - (U @ U.conj().T), 2) / np.linalg.norm(self.sampler.P, 2)
 
 
 #    _____                       _
@@ -286,8 +286,16 @@ class GenericSampleGenerator(object):
 
     def __init__(self, A, B, C, D):
         self.n = np.shape(A)[0]
-        self.m = np.shape(B)[1]
-        self.p = np.shape(C)[0]
+        if len (np.shape(B)) > 1:
+            self.m = np.shape(B)[1]
+        else:
+            self.m = 1
+            B = B[:, np.newaxis]
+        if len(np.shape(C)) > 1:
+            self.p = np.shape(C)[0]
+        else:
+            self.p = 1
+            C = C[np.newaxis]
         self.I = np.eye(self.n)
         self.A = A
         self.B = B
@@ -302,7 +310,7 @@ class GenericSampleGenerator(object):
         # So, N blocks of p x m transfer function evals
         Gs = np.zeros([np.shape(s)[0], self.m, self.m])
         for j, sj in enumerate(sj):
-            Gs[j, :, :] = np.dot(self.C, np.linalg.solve((sj * self.I - self.A), self.B))
+            Gs[j, :, :] = self.C @ np.linalg.solve((sj * self.I - self.A), self.B)
 
         return Gs
 
@@ -397,15 +405,20 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
     def __init__(self, A, B, C, D):
         # Only implemented for square systems with p = m
-        if np.shape(C)[0] != np.shape(B)[1]:
+        super().__init__(A, B, C, D)
+        if self.m != self.p:
             raise NotImplementedError
-        elif not np.all(np.linalg.eigvals(D + D.T) > 0):
-            raise ValueError("System must be positive real")
-        else:
-            super().__init__(A, B, C, D)
-            self.R = D + D.T
+        self.R = D + D.T
+        if self.m > 1: # MIMO case
             self.Rinv = np.linalg.solve(self.R, np.eye(self.m))
             self.R_invsqrt = np.linalg.cholesky(self.Rinv)
+            if not np.all(np.linalg.eigvals(self.R) > 0):
+                raise ValueError("System must be positive real")
+        else: # SISO case
+            self.Rinv = 1 / self.R
+            self.R_invsqrt = np.sqrt(self.Rinv)
+            if not(self.R > 0):
+                raise ValueError("System must be positive real")
 
     @cached_property
     def Q(self):
@@ -435,7 +448,6 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         return (self.B - (self.P @ self.C.T)) @ self.R_invsqrt
 
-    # @cache
     def sample_rsf(self, sl):
         # Artifcially sample the (strictly proper part) of the right spectral factor (rsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
@@ -444,11 +456,10 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Ms = np.zeros([np.shape(sl)[0], self.m, self.m])
         for k, sl_k in enumerate(sl):
-            Ms[k, :, :] = np.dot(self.C_rsf, np.linalg.solve((sl_k * self.I - self.A), self.B))
+            Ms[k, :, :] = self.C_rsf @ np.linalg.solve((sl_k * self.I - self.A), self.B)
 
         return Ms
 
-    # @cache
     def sample_lsf(self, sr):
         # Artifcially sample the (strictly proper part) of the left spectral factor (lsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
@@ -457,11 +468,10 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Ns = np.zeros([np.shape(sr)[0], self.m, self.m])
         for j, sr_j in enumerate(sr):
-            Ns[j, :, :] = np.dot(self.C, np.linalg.solve((sr_j * self.I - self.A), self.B_lsf))
+            Ns[j, :, :] = self.C @ np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
 
         return Ns
 
-    # @cache
     def sample_sfcascade(self, s):
         # Artifcially sample the system cascade
         #   ..math: `H(s) : = [M(s) * N(-s).T]_+ = C_rsf * (s * I - A) \ B_lsf`
@@ -470,12 +480,12 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Hs = np.zeros([np.shape(s)[0], self.m, self.m])
         for j, sj in enumerate(s):
-            Hs[j, :, :] = np.dot(self.C_rsf, np.linalg.solve((sj * self.I - self.A), self.B_lsf))
+            Hs[j, :, :] = self.C_rsf @ np.linalg.solve((sj * self.I - self.A), self.B_lsf)
 
         return Hs
 
 
-def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
+def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=200, ordering="interlace"):
     """Prepare quadrature modes/weights according to the composite Trapezoidal rule.
     For use in QuadBT, integral representations of Gramians along the imaginary axis.
 
@@ -521,16 +531,14 @@ def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
         # Add complex conjugates
         modesl = np.r_[np.conjugate(modesl)[::-1], modesl]
         modesr = np.r_[np.conjugate(modesr)[::-1], modesr]
-        # weightsl = np.r_[modesl[1] - modesl[0], modesl[2:] - modesl[1:-1]]
         weightsl = np.r_[
             modesl[1] - modesl[0], modesl[2:] - modesl[0:-2], modesl[-1:] - modesl[-2:-1]
         ] * (1 / 2)
-        # weightsr = np.r_[modesr[1] - modesr[0], modesr[2:] - modesr[1:-1]]
         weightsr = np.r_[
             modesr[1] - modesr[0], modesr[2:] - modesr[0:-2], modesr[-1:] - modesr[-2:-1]
         ] * (1 / 2)
-        weightsl = 1 / np.sqrt(2 * np.pi) * np.absolute(weightsl)
-        weightsr = 1 / np.sqrt(2 * np.pi) * np.absolute(weightsr)
+        weightsl = 1 / np.sqrt(2 * np.pi) * np.sqrt(np.absolute(weightsl))
+        weightsr = 1 / np.sqrt(2 * np.pi) * np.sqrt(np.absolute(weightsr))
         return modesl, modesr, weightsl, weightsr
     else:
         raise NotImplementedError
