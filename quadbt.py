@@ -257,11 +257,15 @@ class GeneralizedQuadBTReductor(object):
         # Return error in underlying quadrature rules
         print("Relative Error in Q")
         Lh = self.sampler.left_sqrt_fact_Lh(self.modesl, self.weightsl)
-        yield np.linalg.norm(self.sampler.Q - (Lh.conj().T @ Lh), 2) / np.linalg.norm(self.sampler.Q, 2)
+        yield np.linalg.norm(self.sampler.Q - (Lh.conj().T @ Lh), 2) / np.linalg.norm(
+            self.sampler.Q, 2
+        )
 
         U = self.sampler.right_sqrt_fact_U(self.modesr, self.weightsr)
         print("Relative Error in P")
-        yield np.linalg.norm(self.sampler.P - (U @ U.conj().T), 2) / np.linalg.norm(self.sampler.P, 2)
+        yield np.linalg.norm(self.sampler.P - (U @ U.conj().T), 2) / np.linalg.norm(
+            self.sampler.P, 2
+        )
 
 
 #    _____                       _
@@ -286,7 +290,7 @@ class GenericSampleGenerator(object):
 
     def __init__(self, A, B, C, D):
         self.n = np.shape(A)[0]
-        if len (np.shape(B)) > 1:
+        if len(np.shape(B)) > 1:
             self.m = np.shape(B)[1]
         else:
             self.m = 1
@@ -409,15 +413,15 @@ class QuadPRBTSampler(GenericSampleGenerator):
         if self.m != self.p:
             raise NotImplementedError
         self.R = D + D.T
-        if self.m > 1: # MIMO case
+        if self.m > 1:  # MIMO case
             self.Rinv = np.linalg.solve(self.R, np.eye(self.m))
             self.R_invsqrt = np.linalg.cholesky(self.Rinv)
             if not np.all(np.linalg.eigvals(self.R) > 0):
                 raise ValueError("System must be positive real")
-        else: # SISO case
+        else:  # SISO case
             self.Rinv = 1 / self.R
             self.R_invsqrt = np.sqrt(self.Rinv)
-            if not(self.R > 0):
+            if not (self.R > 0):
                 raise ValueError("System must be positive real")
 
     @cached_property
