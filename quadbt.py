@@ -60,7 +60,7 @@ class GeneralizedQuadBTReductor(object):
         self.modesl = modesl
         self.modesr = modesr
         self.weightsl = weightsl
-        self.weightsl = weightsr
+        self.weightsr = weightsr
         assert typ in ("quadbt", "quadbrbt", "quadprbt", "quadbst", "quadfwbt")
         self.typ = typ
 
@@ -210,10 +210,10 @@ class GeneralizedQuadBTReductor(object):
     # Key BT quantities from relevant data are computed once then cached, can be recycled for different orders of reduction
     @cached_property
     def Lbar_Mbar(self):
-        if self.typ is "quadbrbt":
+        if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return _Lbar_Mbar(
+            return self._Lbar_Mbar(
                 self.sl,
                 self.sr,
                 self.sampler.sample_sfcascade(self.sl),  # Left samples
@@ -224,47 +224,44 @@ class GeneralizedQuadBTReductor(object):
 
     @cached_property
     def Gbar(self):
-        if self.typ is "quadbrbt":
+        if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return _Gbar(self.sampler.sample_rsf(self.sr), self.weightsr)
+            return self._Gbar(self.sampler.sample_rsf(self.sr), self.weightsr)
 
     @cached_property
     def Hbar(self):
-        if self.typ is "quadbrbt":
+        if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return _Hbar(self.sampler.sample_lsf(self.sl), self.weightsl)
+            return self._Hbar(self.sampler.sample_lsf(self.sl), self.weightsl)
 
     @cached_property
     def svd_from_data(self):
         # Compute the SVD once, then cache it
         Zbar, sbar, Yhbar = np.linalg.svd(self.Lbar, full_matrices=False)
-        return Zbar, sbar, Yhbar.H
+        return Zbar, sbar, Yhbar.conj().T
 
     def reduce(self, r):
         # Compute SVD of Loewner matrix L
         Zbar, sbar, Ybar = self.svd_from_data
         # Build Petrov-Galerkin Projection matrices and project onto intermediate quantities from data
         Sbar1_invsqrt = np.diag(1 / np.sqrt(sbar[1:r]))
-        Arbar = Sbar1_invsqrt @ Zbar[:, 1:r].H @ self.Mbar @ Ybar[:, 1:r] @ Sbar1_invsqrt
-        Brbar = Sbar1_invsqrt @ Zbar[:, 1:r].H @ self.Hbar
+        Arbar = Sbar1_invsqrt @ Zbar[:, 1:r].conj().T @ self.Mbar @ Ybar[:, 1:r] @ Sbar1_invsqrt
+        Brbar = Sbar1_invsqrt @ Zbar[:, 1:r].conj().T @ self.Hbar
         Crbar = self.Gbar @ Ybar[:, 1:r] @ Sbar1_invsqrt
 
         return Arbar, Crbar, Brbar
 
     def quadrature_errors(self):
         # Return error in underlying quadrature rules
-        print("Error in Q")
-        yield np.linalg.norm(
-            self.sampler.Q
-            - np.dot(self.sampler.left_sqrt_fact_Lh.H * self.sampler.left_sqrt_fact_Lh)
-        )
-        print("Error in P")
-        yield np.linalg.norm(
-            self.sampler.P
-            - np.dot(self.sampler.right_sqrt_fact_U * self.sampler.left_sqrt_fact_U.H)
-        )
+        print("Relative Error in Q")
+        Lh = self.sampler.left_sqrt_fact_Lh(self.modesl, self.weightsl)
+        yield np.linalg.norm(self.sampler.Q - (Lh.conj().T @ Lh)) / np.linalg.norm(self.sampler.Q)
+
+        U = self.sampler.right_sqrt_fact_U(self.modesr, self.weightsr)
+        print("Relative Error in P")
+        yield np.linalg.norm(self.sampler.P - (U @ U.conj().T)) / np.linalg.norm(self.sampler.P)
 
 
 #    _____                       _
@@ -289,9 +286,9 @@ class GenericSampleGenerator(object):
 
     def __init__(self, A, B, C, D):
         self.n = np.shape(A)[0]
-        self.m = np.shape[B][1]
-        self.p = np.shape[C][0]
-        self.I = np.eye([self.n, self.n])
+        self.m = np.shape(B)[1]
+        self.p = np.shape(C)[0]
+        self.I = np.eye(self.n)
         self.A = A
         self.B = B
         self.C = C
@@ -343,6 +340,7 @@ class QuadBTSampler(GenericSampleGenerator):
     def sample_sfcascade(self, s):
         return self.sampleG(s)
 
+    # TODO: Update these two functions below to reflect that in the prbt class
     def right_sqrt_fact_U(self, sr, weightsr):
         # Return approximate quadrature-based sqrt factor
         #   ..math: `P \approx U * Uh,  U \in \C^{n \times (Nr * m)}`
@@ -392,15 +390,15 @@ class QuadPRBTSampler(GenericSampleGenerator):
         else:
             super().__init__(A, B, C, D)
             self.R = D + D.T
-            self.R_sqrt = np.linalg.cholesky(self.R)
-            self.Rinv = np.linalg.solve(self.R, np.eye(self.n, self.n))
+            self.Rinv = np.linalg.solve(self.R, np.eye(self.m))
+            self.R_invsqrt = np.linalg.cholesky(self.Rinv)
 
     @cached_property
     def Q(self):
         # Solve + cache ARE
         #   :math: A.T * Qprbt + Qprbt.T * A + (C - B.T * Qprbt).T * Rinv * (C - B.T * Qprbt) = 0
         return sp.linalg.solve_continuous_are(
-            self.A, -1 * (self.B), np.zeros(self.n, self.n), -1 * (self.R), None, -1 * (self.B)
+            self.A, -1 * (self.B), np.zeros([self.n, self.n]), -1 * (self.R), self.I, self.C.T
         )
 
     @cached_property
@@ -408,20 +406,20 @@ class QuadPRBTSampler(GenericSampleGenerator):
         # Solve + cache ARE
         #   :math: A * Pprbt + Pprbt.T * A + (Pprbt * C.T - B) * Rinv * (Pprbt * C.T - B).T = 0
         return sp.linalg.solve_continuous_are(
-            self.A.T, self.C.T, np.zeros(self.n, self.n), -1 * (self.R), None, -1 * (self.B)
+            self.A.T, self.C.T, np.zeros([self.n, self.n]), -1 * (self.R), self.I, -1 * (self.B)
         )
 
     @cached_property
     def C_rsf(self):
         # Output matrix of right spectral factor (rsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
-        return np.linalg.solve(self.R_sqrt, self.C - np.dot(self.B.T, self.Q))
+        return self.R_invsqrt @ (self.C - (self.B.T @ self.Q))
 
     @cached_property
     def B_lsf(self):
         # Input matrix of left spectral factor (lsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
-        return np.linalg.solve(self.B - np.dot(self.P, self.C.T), self.R_sqrt)
+        return (self.B - (self.P @ self.C.T)) @ self.R_invsqrt
 
     # @cache
     def sample_rsf(self, sl):
@@ -467,27 +465,28 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `Pprbt \approx U * Uh,  U \in \C^{n \times (Nr * m)}`
         # Used in checking error of the implicity quadrature rule
         assert np.shape(sr)[0] == np.shape(weightsr)[0]
-        U = np.zeros([self.n, np.shape(sr)[0] * self.m])
+        U = np.zeros([np.shape(sr)[0], self.n, self.m], dtype="complex_")
         for j, sr_j in enumerate(sr):
-            U[:, j] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
+            U[j, :, :] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
 
-        return U
+        return np.concatenate(U, axis=1)
 
     def left_sqrt_fact_Lh(self, sl, weightsl):
+        # TODO: Move to Parent class, and add redundant self.C_lsf, self.B_lsf, etc. to reduce redundancy in the codes
         # Return approximate quadrature-based sqrt factor
         #   ..math: `Qprbt \approx L * Lh,  Lh \in \C^{(p * Nl) \times n}`
         # Used in checking error of the implicity quadrature rule
         assert np.shape(sl)[0] == np.shape(weightsl)[0]
-        Lh = np.zeros([np.shape(sl)[0] * self.p, self.n])
+        Lh = np.zeros([np.shape(sl)[0], self.p, self.n], dtype="complex_")
         for k, sl_k in enumerate(sl):
-            Lh[k, :] = weightsl[k] * np.dot(
-                self.C_rsf, np.linalg.solve((sl_k * self.I - self.A), self.I)
+            Lh[k, :, :] = weightsl[k] * (
+                self.C_rsf @ np.linalg.solve((sl_k * self.I - self.A), self.I)
             )
 
-        return Lh
+        return np.concatenate(Lh, axis=0)
 
 
-def trapezoidalrule(exp_limits=np.array((-3, 3)), N=400, ordering="same"):
+def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
     """Prepare quadrature modes/weights according to the composite Trapezoidal rule.
     For use in QuadBT, integral representations of Gramians along the imaginary axis.
 
@@ -533,12 +532,16 @@ def trapezoidalrule(exp_limits=np.array((-3, 3)), N=400, ordering="same"):
         # Add complex conjugates
         modesl = np.r_[np.conjugate(modesl)[::-1], modesl]
         modesr = np.r_[np.conjugate(modesr)[::-1], modesr]
+        # weightsl = np.r_[modesl[1] - modesl[0], modesl[2:] - modesl[1:-1]]
         weightsl = np.r_[
             modesl[1] - modesl[0], modesl[2:] - modesl[0:-2], modesl[-1:] - modesl[-2:-1]
         ] * (1 / 2)
+        # weightsr = np.r_[modesr[1] - modesr[0], modesr[2:] - modesr[1:-1]]
         weightsr = np.r_[
             modesr[1] - modesr[0], modesr[2:] - modesr[0:-2], modesr[-1:] - modesr[-2:-1]
         ] * (1 / 2)
+        weightsl = 1 / np.sqrt(2 * np.pi) * np.absolute(weightsl)
+        weightsr = 1 / np.sqrt(2 * np.pi) * np.absolute(weightsr)
         return modesl, modesr, weightsl, weightsr
     else:
         raise NotImplementedError
