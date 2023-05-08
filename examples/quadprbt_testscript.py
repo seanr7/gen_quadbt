@@ -1,8 +1,12 @@
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from functools import cache, cached_property
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-from quadbt import *
+from gen_qbt.quadbt import *
 from ABC_MIMO_mass_spring_damper import abc_mimo_mass_spring_damper
 
 # Build toy positive-real system
