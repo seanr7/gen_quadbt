@@ -51,7 +51,7 @@ class GeneralizedQuadBTReductor(object):
     Given fixed pairs of modes/weights; the only effective difference in performing data-driven balancing is the |GeneralizedSampler| class passed
     """
 
-    def __init__(self, sampler, modesl, modesr, weightsl, weightsr, typ):
+    def __init__(self, sampler, modesl, modesr, weightsl, weightsr, typ="quadbt"):
         # Takes instances of `Loewner_Manager` class and child of `GenericSampleGenerator` class
         # For purpose of generating relevant tf samples and building the relevant Leowner matrices from said samples
         # The only thing that changes between the different types of QuadBT is the sampler given
@@ -123,15 +123,20 @@ class GeneralizedQuadBTReductor(object):
             # Output of broadcast is a (Nl, Nr, p, m) np.array
             Lbar = Gsl[:, np.newaxis] - Gsr[np.newaxis]
             # Now, this differ sl - sr of size (Nl, Nr) is broadcast and divided into each (p, m) `entry` of L
-            Lbar /= (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-            Lbar *= -(weightsl[:, np.newaxis] - weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-            Mbar = (
-                sl[np.newaxis, np.newaxis] * Gsl[:, np.newaxis]
-                - sr[np.newaxis, np.newaxis] * Gsr[np.newaxis]
+            Lbar = Lbar / (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+            Lbar = (
+                Lbar
+                * -(weightsl[:, np.newaxis] * weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
             )
-            Mbar /= (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-            Mbar *= -(weightsl[:, np.newaxis] - weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
-
+            # Output of broadcast is a (Nl, Nr, p, m) np.array
+            Mbar = (sl[:, np.newaxis, np.newaxis] * Gsl)[:, np.newaxis] - (
+                sr[:, np.newaxis, np.newaxis] * Gsr
+            )[np.newaxis]
+            Mbar = Mbar / (sl[:, np.newaxis] - sr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+            Mbar = (
+                Mbar
+                * -(weightsl[:, np.newaxis] * weightsr[np.newaxis])[:, :, np.newaxis, np.newaxis]
+            )
             # `Unpack` into 2d numpy arrays
             Lbar = np.concatenate(np.concatenate(Lbar, axis=1), axis=1)
             Mbar = np.concatenate(np.concatenate(Mbar, axis=1), axis=1)
@@ -144,7 +149,7 @@ class GeneralizedQuadBTReductor(object):
         """
         TODO: Doctest!
         Build output matrix in Loewner quadruple
-            ..math: `Gbar[k, :, :] = -weightsr[k] * Gsr[k, : :]`
+            ..math: `Gbar[k, :, :] = weightsr[k] * Gsr[k, : :]`
         Gbar is used in constructing the reduced Cr matrix in QuadBT;
             ..math: `Gbar = C * U`
 
@@ -162,8 +167,6 @@ class GeneralizedQuadBTReductor(object):
         """
 
         # Prep data in SISO case
-        if len(np.shape(Gsl)) == 1:
-            Gsl = Gsl[:, np.newaxis, np.newaxis]
         if len(np.shape(Gsr)) == 1:
             Gsr = Gsr[:, np.newaxis, np.newaxis]
 
@@ -177,9 +180,9 @@ class GeneralizedQuadBTReductor(object):
         """
         TODO: Doctest!
         Build output matrix in Loewner quadruple
-            ..math: `Hbar[j, :, :] = -weightsl[j] * Gsl[j, : :]`
+            ..math: `Hbar[j, :, :] = weightsl[j] * Gsl[j, : :]`
         Hbar is used in constructing the reduced Br matrix in QuadBT;
-            ..math: `Hbar = L.T * B`
+            ..math: `Hbar = Lh * B`
 
         Parameters
         ----------
@@ -199,8 +202,6 @@ class GeneralizedQuadBTReductor(object):
         # Prep data in SISO case
         if len(np.shape(Gsl)) == 1:
             Gsl = Gsl[:, np.newaxis, np.newaxis]
-        if len(np.shape(Gsr)) == 1:
-            Gsr = Gsr[:, np.newaxis, np.newaxis]
 
         Gsl = weightsl[:, np.newaxis, np.newaxis, np.newaxis] * Gsl[:, np.newaxis]
         # Gsl now a 4d numpy array: `(Nl x 1) matrix with (p x m) entries'
@@ -214,10 +215,10 @@ class GeneralizedQuadBTReductor(object):
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
             return self._Lbar_Mbar(
-                self.sl,
-                self.sr,
-                self.sampler.sample_sfcascade(self.sl),  # Left samples
-                self.sampler.sample_sfcascade(self.sr),  # Right samples
+                self.modesl,
+                self.modesr,
+                self.sampler.sample_sfcascade(self.modesl),  # Left samples
+                self.sampler.sample_sfcascade(self.modesr),  # Right samples
                 self.weightsl,
                 self.weightsr,
             )
@@ -227,19 +228,20 @@ class GeneralizedQuadBTReductor(object):
         if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return self._Gbar(self.sampler.sample_rsf(self.sr), self.weightsr)
+            return self._Gbar(self.sampler.sample_rsf(self.modesr), self.weightsr)
 
     @cached_property
     def Hbar(self):
         if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return self._Hbar(self.sampler.sample_lsf(self.sl), self.weightsl)
+            return self._Hbar(self.sampler.sample_lsf(self.modesl), self.weightsl)
 
     @cached_property
     def svd_from_data(self):
         # Compute the SVD once, then cache it
-        Zbar, sbar, Yhbar = np.linalg.svd(self.Lbar, full_matrices=False)
+        Lbar, _ = self.Lbar_Mbar
+        Zbar, sbar, Yhbar = np.linalg.svd(Lbar, full_matrices=False)
         return Zbar, sbar, Yhbar.conj().T
 
     def hsvbar(self):
@@ -298,15 +300,13 @@ class GenericSampleGenerator(object):
         if len(np.shape(B)) > 1:
             self.m = np.shape(B)[1]
         else:
-            self.m = 1
-            B = B[:, np.newaxis]
+            raise ValueError("B must be a 2d |Numpy Array| with dimensions (n, m)")
         if len(np.shape(C)) > 1:
             self.p = np.shape(C)[0]
         else:
-            self.p = 1
-            C = C[np.newaxis]
-        if len(np.shape(D)) != 2:
-            raise ValueError("D must be a 2d numpy array")
+            raise ValueError("C must be a 2d |Numpy Array| with dimensions (p, n)")
+        if len(np.shape(D)) != 2 and D is not None:
+            raise ValueError("D must be a 2d |Numpy Array| with dimensions (p, m)")
         self.I = np.eye(self.n)
         self.A = A
         self.B = B
@@ -318,8 +318,8 @@ class GenericSampleGenerator(object):
 
         # Pre-allocate space for samples, store as 3d numpy array of dim (N, p, m)
         # So, N blocks of p x m transfer function evals
-        Gs = np.zeros([np.shape(s)[0], self.m, self.m])
-        for j, sj in enumerate(sj):
+        Gs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
+        for j, sj in enumerate(s):
             Gs[j, :, :] = self.C @ np.linalg.solve((sj * self.I - self.A), self.B)
 
         return Gs
@@ -372,18 +372,20 @@ class QuadBTSampler(GenericSampleGenerator):
     def Q(self):
         # Solve + cache ALE
         #   :math: A.T * Q + Q * A + C.T * C = 0
-        return sp.linalg.solve_continuous_lyapunov(self.A.T, -self.C.T * self.C)
+        return sp.linalg.solve_continuous_lyapunov(self.A.T, -(self.C.T @ self.C))
 
     @cached_property
     def P(self):
         # Solve + cache ALE
         #   :math: A * P + P.T * A + B *B.T = 0
-        return sp.linalg.solve_continuous_lyapunov(self.A, -self.B * self.B.T)
+        return sp.linalg.solve_continuous_lyapunov(self.A, -(self.B @ self.B.T))
 
+    @cached_property
     def C_rsf(self):
         # Return output matrix C as self.C_rsf. For use in checkig quadrature error
         return self.C
 
+    @cached_property
     def B_lsf(self):
         # Return input matrix B as self.B_lsf. For use in checking quadrature error
         return self.B
@@ -465,7 +467,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         # :math: `M(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Br = Lprbt.T * B
 
-        Ms = np.zeros([np.shape(sl)[0], self.m, self.m])
+        Ms = np.zeros([np.shape(sl)[0], self.m, self.m], dtype="complex_")
         for k, sl_k in enumerate(sl):
             Ms[k, :, :] = self.C_rsf @ np.linalg.solve((sl_k * self.I - self.A), self.B)
 
@@ -477,7 +479,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         # :math: `N(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Cr = C * Uprbt
 
-        Ns = np.zeros([np.shape(sr)[0], self.m, self.m])
+        Ns = np.zeros([np.shape(sr)[0], self.m, self.m], dtype="complex_")
         for j, sr_j in enumerate(sr):
             Ns[j, :, :] = self.C @ np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
 
@@ -489,7 +491,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         # _+ denotes the stable part of the transfer function
         # In QuadPRBT, these samples are used in building the reduced Ar = Lprbt.T * A * Uprbt and approximate Hankel singular values
 
-        Hs = np.zeros([np.shape(s)[0], self.m, self.m])
+        Hs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
         for j, sj in enumerate(s):
             Hs[j, :, :] = self.C_rsf @ np.linalg.solve((sj * self.I - self.A), self.B_lsf)
 
