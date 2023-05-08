@@ -225,17 +225,21 @@ class GeneralizedQuadBTReductor(object):
 
     @cached_property
     def Gbar(self):
+        # Used in replacing C with Gbar = C * U from data
         if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return self._Gbar(self.sampler.sample_lsf(self.modesr), self.weightsr)
+            # Using samples C * (s * I - A) \ B_rsf
+            return self._Gbar(self.sampler.sample_rsf(self.modesr), self.weightsr)
 
     @cached_property
     def Hbar(self):
+        # Used in replacing B with Hbar = Lh * B from data
         if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return self._Hbar(self.sampler.sample_rsf(self.modesl), self.weightsl)
+            # Using samples C_lsf * (s * I - A) \ B
+            return self._Hbar(self.sampler.sample_lsf(self.modesl), self.weightsl)
 
     @cached_property
     def svd_from_data(self):
@@ -324,10 +328,10 @@ class GenericSampleGenerator(object):
 
         return Gs
 
-    def B_lsf(self):
+    def B_rsf(self):
         raise NotImplementedError
 
-    def C_rsf(self):
+    def C_lsf(self):
         raise NotImplementedError
 
     def right_sqrt_fact_U(self, sr, weightsr):
@@ -337,12 +341,12 @@ class GenericSampleGenerator(object):
         assert np.shape(sr)[0] == np.shape(weightsr)[0]
         U = np.zeros([np.shape(sr)[0], self.n, self.m], dtype="complex_")
         for j, sr_j in enumerate(sr):
-            U[j, :, :] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
+            U[j, :, :] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B_rsf)
 
         return np.concatenate(U, axis=1)
 
     def left_sqrt_fact_Lh(self, sl, weightsl):
-        # TODO: Move to Parent class, and add redundant self.C_lsf, self.B_lsf, etc. to reduce redundancy in the codes
+        # TODO: Move to Parent class, and add redundant self.C_lsf, self.B_rsf, etc. to reduce redundancy in the codes
         # Return approximate quadrature-based sqrt factor
         #   ..math: `Qprbt \approx L * Lh,  Lh \in \C^{(p * Nl) \times n}`
         # Used in checking error of the implicity quadrature rule
@@ -350,7 +354,7 @@ class GenericSampleGenerator(object):
         Lh = np.zeros([np.shape(sl)[0], self.p, self.n], dtype="complex_")
         for k, sl_k in enumerate(sl):
             Lh[k, :, :] = weightsl[k] * (
-                self.C_rsf @ np.linalg.solve((sl_k * self.I - self.A), self.I)
+                self.C_lsf @ np.linalg.solve((sl_k * self.I - self.A), self.I)
             )
 
         return np.concatenate(Lh, axis=0)
@@ -381,13 +385,13 @@ class QuadBTSampler(GenericSampleGenerator):
         return sp.linalg.solve_continuous_lyapunov(self.A, -(self.B @ self.B.T))
 
     @cached_property
-    def C_rsf(self):
-        # Return output matrix C as self.C_rsf. For use in checkig quadrature error
+    def C_lsf(self):
+        # Return output matrix C as self.C_lsf. For use in checkig quadrature error
         return self.C
 
     @cached_property
-    def B_lsf(self):
-        # Return input matrix B as self.B_lsf. For use in checking quadrature error
+    def B_rsf(self):
+        # Return input matrix B as self.B_rsf. For use in checking quadrature error
         return self.B
 
     # Return samples of G from method of parent class
@@ -450,19 +454,19 @@ class QuadPRBTSampler(GenericSampleGenerator):
         )
 
     @cached_property
-    def C_rsf(self):
-        # Output matrix of right spectral factor (rsf) of the Popov function
+    def C_lsf(self):
+        # Output matrix of left spectral factor (lsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         return self.R_invsqrt @ (self.C - (self.B.T @ self.Q))
 
     @cached_property
-    def B_lsf(self):
-        # Input matrix of left spectral factor (lsf) of the Popov function
+    def B_rsf(self):
+        # Input matrix of right spectral factor (rsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         return (self.B - (self.P @ self.C.T)) @ self.R_invsqrt
 
-    def sample_rsf(self, sl):
-        # Artifcially sample the (strictly proper part) of the right spectral factor (rsf) of the Popov function
+    def sample_lsf(self, sl):
+        # Artifcially sample the (strictly proper part) of the left spectral factor (lsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         # :math: `M(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Br = Lprbt.T * B
@@ -470,12 +474,12 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Ms = np.zeros([np.shape(sl)[0], self.m, self.m], dtype="complex_")
         for k, sl_k in enumerate(sl):
-            Ms[k, :, :] = self.C_rsf @ np.linalg.solve((sl_k * self.I - self.A), self.B)
+            Ms[k, :, :] = self.C_lsf @ np.linalg.solve((sl_k * self.I - self.A), self.B)
 
         return Ms
 
-    def sample_lsf(self, sr):
-        # Artifcially sample the (strictly proper part) of the left spectral factor (lsf) of the Popov function
+    def sample_rsf(self, sr):
+        # Artifcially sample the (strictly proper part) of the right spectral factor (rsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         # :math: `N(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Cr = C * Uprbt
@@ -483,19 +487,19 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         Ns = np.zeros([np.shape(sr)[0], self.m, self.m], dtype="complex_")
         for j, sr_j in enumerate(sr):
-            Ns[j, :, :] = self.C @ np.linalg.solve((sr_j * self.I - self.A), self.B_lsf)
+            Ns[j, :, :] = self.C @ np.linalg.solve((sr_j * self.I - self.A), self.B_rsf)
 
         return Ns
 
     def sample_sfcascade(self, s):
         # Artifcially sample the system cascade
-        #   ..math: `H(s) : = [M(s) * N(-s).T]_+ = C_rsf * (s * I - A) \ B_lsf`
+        #   ..math: `H(s) : = [M(s) * N(-s).T]_+ = C_lsf * (s * I - A) \ B_rsf`
         # _+ denotes the stable part of the transfer function
         # In QuadPRBT, these samples are used in building the reduced Ar = Lprbt.T * A * Uprbt and approximate Hankel singular values
 
         Hs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
         for j, sj in enumerate(s):
-            Hs[j, :, :] = self.C_rsf @ np.linalg.solve((sj * self.I - self.A), self.B_lsf)
+            Hs[j, :, :] = self.C_lsf @ np.linalg.solve((sj * self.I - self.A), self.B_rsf)
 
         return Hs
 
