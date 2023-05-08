@@ -228,14 +228,14 @@ class GeneralizedQuadBTReductor(object):
         if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return self._Gbar(self.sampler.sample_rsf(self.modesr), self.weightsr)
+            return self._Gbar(self.sampler.sample_lsf(self.modesr), self.weightsr)
 
     @cached_property
     def Hbar(self):
         if self.typ == "quadbrbt":
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
-            return self._Hbar(self.sampler.sample_lsf(self.modesl), self.weightsl)
+            return self._Hbar(self.sampler.sample_rsf(self.modesl), self.weightsl)
 
     @cached_property
     def svd_from_data(self):
@@ -466,6 +466,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         # :math: `M(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Br = Lprbt.T * B
+        # Called during `GeneralizedQuadBTReductor.Hbar`
 
         Ms = np.zeros([np.shape(sl)[0], self.m, self.m], dtype="complex_")
         for k, sl_k in enumerate(sl):
@@ -478,6 +479,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         # :math: `N(s)` is an m x m rational transfer function
         # In QuadPRBT, these samples are used in building the reduced Cr = C * Uprbt
+        # Called during `GeneralizedQuadBTReductor.Gbar`
 
         Ns = np.zeros([np.shape(sr)[0], self.m, self.m], dtype="complex_")
         for j, sr_j in enumerate(sr):
@@ -504,7 +506,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
 #
 
 
-def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=200, ordering="interlace"):
+def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
     """Prepare quadrature modes/weights according to the composite Trapezoidal rule.
     For use in QuadBT, integral representations of Gramians along the imaginary axis.
 
