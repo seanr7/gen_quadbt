@@ -6,8 +6,8 @@ from functools import cache, cached_property
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-from gen_qbt.quadbt import *
-from ABC_MIMO_mass_spring_damper import abc_mimo_mass_spring_damper
+from gen_qbt.quadbt import QuadPRBTSampler, GeneralizedQuadBTReductor, trapezoidal_rule
+from models import abc_mimo_mass_spring_damper
 
 # Build toy positive-real system
 n = 50
