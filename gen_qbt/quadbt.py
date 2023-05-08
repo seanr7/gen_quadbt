@@ -427,15 +427,15 @@ class QuadPRBTSampler(GenericSampleGenerator):
             raise NotImplementedError
         self.R = D + D.T
         if self.m > 1:  # MIMO case
-            self.Rinv = np.linalg.solve(self.R, np.eye(self.m))
-            self.R_invsqrt = np.linalg.cholesky(self.Rinv)
             if not np.all(np.linalg.eigvals(self.R) > 0):
                 raise ValueError("System must be positive real")
+            self.Rinv = np.linalg.solve(self.R, np.eye(self.m))
+            self.R_invsqrt = np.linalg.cholesky(self.Rinv)
         else:  # SISO case
-            self.Rinv = 1 / self.R
-            self.R_invsqrt = np.sqrt(self.Rinv)
             if not (self.R > 0):
                 raise ValueError("System must be positive real")
+            self.Rinv = 1 / self.R
+            self.R_invsqrt = np.sqrt(self.Rinv)
 
     @cached_property
     def Q(self):
@@ -493,7 +493,7 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
     def sample_sfcascade(self, s):
         # Artifcially sample the system cascade
-        #   ..math: `H(s) : = [M(s) * N(-s).T]_+ = C_lsf * (s * I - A) \ B_rsf`
+        #   ..math: `H(s) : = [M(s) * (N(-s).T)^{-1}]_+ = C_lsf * (s * I - A) \ B_rsf`
         # _+ denotes the stable part of the transfer function
         # In QuadPRBT, these samples are used in building the reduced Ar = Lprbt.T * A * Uprbt and approximate Hankel singular values
 
@@ -508,6 +508,93 @@ class QuadPRBTSampler(GenericSampleGenerator):
 #    / \      _.  _| |_) (_   |
 #    \_X |_| (_| (_| |_) __)  |
 #
+
+
+class QuadBSTSampler(GenericSampleGenerator):
+    """Class to generate relevant transfer function samples for use in Quadrature-Based Balanced Stochastic Truncation (QuadBST)
+
+    Paramters
+    ---------
+    A, B, C, D
+        State-space realization of the FOM, all matrices are |Numpy Arrays| of size (n, n), (n, m), (p, n), and (p, m) respectively
+    """
+
+    def __init__(self, A, B, C, D):
+        # Only implemented for square systems with p = m
+        super().__init__(A, B, C, D)
+        if self.m != self.p:
+            raise NotImplementedError
+        # self.R = D @ D.T
+        if self.m > 1:  # MIMO case
+            if not np.all(np.linalg.eigvals(self.D) > 0):
+                raise ValueError("D must be nonsingular")
+            self.Dinv = np.linalg.solve(self.D, np.eye(self.m))
+        else:  # SISO case
+            if not (self.R > 0):
+                raise ValueError("D must be nonsingular")
+            self.Dinv = 1 / self.D
+
+    @cached_property
+    def Q(self):
+        # Solve + cache ARE
+        #   :math: A.T * Qbst + Qbst.T * A + (C - B_W.T * Qbst).T * Rinv * (C - B_W.T * Qbst) = 0
+        return sp.linalg.solve_continuous_are(
+            self.A,
+            -1 * (self.B_W),
+            np.zeros([self.n, self.n]),
+            -1 * (self.D @ self.D.T),
+            self.I,
+            self.C.T,
+        )
+
+    @cached_property
+    def P(self):
+        #   :math: A * P + P.T * A + B *B.T = 0
+        return sp.linalg.solve_continuous_lyapunov(self.A, -(self.B @ self.B.T))
+
+    @cached_property
+    def B_W(self):
+        # Compute input matrix of left spectral factor (lsf) W(s) s.t.
+        #   ..math: `G(s) @ G(-s).T = W(-s).T @ W(s)`
+        # Used in computing observability Gramian (solution to ARE)
+        return self.P @ self.C.T + self.B @ self.D
+
+    @cached_property
+    def C_lsf(self):
+        # Output matrix of left spectral factor (lsf) s.t
+        #   ..math: `G(s) @ G(-s).T = W(-s).T @ W(s)`
+        return self.Dinv @ (self.C - (self.B_W.T @ self.Q))
+
+    @cached_property
+    def B_rsf(self):
+        # Here, right spectral factor (rsf) is :math: `G(s)` itself, so return B
+        # Called during computing approximate square-root factors
+        return self.B
+
+    def sample_lsf(self, sl):
+        # In QuadBST, this returns samples of the spectral factor cascade
+        # This function is included to maintain generality in the reductor class
+        # Used in building the reduced Br = Lhbst @ B
+        # Called during `GeneralizedQuadBTReductor.Hbar`
+        return self.sample_sfcascade(sl)
+
+    def sample_rsf(self, sr):
+        # Artifcially sample the relevant rsf, here this is just :math: `G(s)`
+        # In QuadBST, these samples are used in building the reduced Cr = C @ Ubst
+        # Called during `GeneralizedQuadBTReductor.Gbar`
+        return self.sampleG(sr)
+
+    def sample_sfcascade(self, s):
+        # Artifcially sample the system cascade
+        #   ..math: `H(s) : = [(W(-s).T)^{-1} * G(s)]_+ = C_lsf * (s * I - A) \ B`
+        # _+ denotes the stable part of the transfer function
+        # In QuadPRBT, these samples are used in building the reduced Ar = Lprbt.T * A * Uprbt and approximate Hankel singular values
+
+        Hs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
+        for j, sj in enumerate(s):
+            Hs[j, :, :] = self.C_lsf @ np.linalg.solve((sj * self.I - self.A), self.B)
+
+        return Hs
 
 
 def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
