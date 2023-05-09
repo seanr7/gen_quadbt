@@ -217,8 +217,8 @@ class GeneralizedQuadBTReductor(object):
             return self._Lbar_Mbar(
                 self.modesl,
                 self.modesr,
-                self.sampler.sample_sfcascade(self.modesl),  # Left samples
-                self.sampler.sample_sfcascade(self.modesr),  # Right samples
+                self.sampler.samples_for_Lbar_Mbar(self.modesl),  # Left samples
+                self.sampler.samples_for_Lbar_Mbar(self.modesr),  # Right samples
                 self.weightsl,
                 self.weightsr,
             )
@@ -230,7 +230,7 @@ class GeneralizedQuadBTReductor(object):
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
             # Using samples C * (s * I - A) \ B_rsf
-            return self._Gbar(self.sampler.sample_rsf(self.modesr), self.weightsr)
+            return self._Gbar(self.sampler.samples_for_Gbar(self.modesr), self.weightsr)
 
     @cached_property
     def Hbar(self):
@@ -239,7 +239,7 @@ class GeneralizedQuadBTReductor(object):
             raise NotImplementedError
         elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
             # Using samples C_lsf * (s * I - A) \ B
-            return self._Hbar(self.sampler.sample_lsf(self.modesl), self.weightsl)
+            return self._Hbar(self.sampler.samples_for_Hbar(self.modesl), self.weightsl)
 
     @cached_property
     def svd_from_data(self):
@@ -329,9 +329,11 @@ class GenericSampleGenerator(object):
         return Gs
 
     def B_rsf(self):
+        # Included to be general; in some Child classes, this will simply return self.B
         raise NotImplementedError
 
     def C_lsf(self):
+        # Included to be general; in some Child classes, this will simply return self.C
         raise NotImplementedError
 
     def right_sqrt_fact_U(self, sr, weightsr):
@@ -395,13 +397,19 @@ class QuadBTSampler(GenericSampleGenerator):
         return self.B
 
     # Return samples of G from method of parent class
-    def sample_rsf(self, s):
+    def samples_for_Gbar(self, s):
+        # Samples used in building Gbar = Lh @ B from data
+        # Gbar used in computing Br
         return self.sampleG(s)
 
-    def sample_lsf(self, sl):
+    def samples_for_Hbar(self, sl):
+        # Samples used in building Hbar = C @ U from data
+        # Hbar used in computing Cr
         return self.sampleG(sl)
 
-    def sample_sfcascade(self, sr):
+    def samples_for_Lbar_Mbar(self, sr):
+        # Samples used in building Lbar = Lh @ U and Mbar = Lh @ A @ U from data
+        # Mbar is usded in computing Ar, Lbar used in approximating the hsvs
         return self.sampleG(sr)
 
 
@@ -465,11 +473,11 @@ class QuadPRBTSampler(GenericSampleGenerator):
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         return (self.B - (self.P @ self.C.T)) @ self.R_invsqrt
 
-    def sample_lsf(self, sl):
+    def samples_for_Hbar(self, sl):
         # Artifcially sample the (strictly proper part) of the left spectral factor (lsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         # :math: `M(s)` is an m x m rational transfer function
-        # In QuadPRBT, these samples are used in building the reduced Br = Lprbt.T * B
+        # In QuadPRBT, these samples are used in building Hbar = Lh_prbt @ B from data
         # Called during `GeneralizedQuadBTReductor.Hbar`
 
         Ms = np.zeros([np.shape(sl)[0], self.m, self.m], dtype="complex_")
@@ -478,11 +486,11 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         return Ms
 
-    def sample_rsf(self, sr):
+    def samples_for_Gbar(self, sr):
         # Artifcially sample the (strictly proper part) of the right spectral factor (rsf) of the Popov function
         #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         # :math: `N(s)` is an m x m rational transfer function
-        # In QuadPRBT, these samples are used in building the reduced Cr = C * Uprbt
+        # In QuadPRBT, these samples are used in building Gbar = C @ U_prbt from data
         # Called during `GeneralizedQuadBTReductor.Gbar`
 
         Ns = np.zeros([np.shape(sr)[0], self.m, self.m], dtype="complex_")
@@ -491,11 +499,12 @@ class QuadPRBTSampler(GenericSampleGenerator):
 
         return Ns
 
-    def sample_sfcascade(self, s):
+    def samples_for_Lbar_Mbar(self, s):
         # Artifcially sample the system cascade
         #   ..math: `H(s) : = [M(s) * (N(-s).T)^{-1}]_+ = C_lsf * (s * I - A) \ B_rsf`
         # _+ denotes the stable part of the transfer function
-        # In QuadPRBT, these samples are used in building the reduced Ar = Lprbt.T * A * Uprbt and approximate Hankel singular values
+        # In QuadPRBT, these samples are used in building Lbar = Lh_prbt @ U_prbt and Mbar = Lh_prbt @ A @ U_prbt
+        # Called during `GeneralizedQuadBTReductor.Lbar_Mbar`
 
         Hs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
         for j, sj in enumerate(s):
@@ -571,20 +580,26 @@ class QuadBSTSampler(GenericSampleGenerator):
         # Called during computing approximate square-root factors
         return self.B
 
-    def sample_lsf(self, sl):
+    # TODO: Change names below to something more informative... e.g.
+    # `samples_for_Hbar` ---> `samples_for_Hbar` or `samples_for_Br`
+    # `samples_for_Gbar` ---> `samples_for_Gbar` or `samples_for_Cr`
+    # `samples_for_Lbar_Mbar` ---> `samples_for_Lbar_Mbar` or `samples_for_Er_Ar`
+    # And update function descriptions...
+
+    def samples_for_Hbar(self, sl):
         # In QuadBST, this returns samples of the spectral factor cascade
         # This function is included to maintain generality in the reductor class
         # Used in building the reduced Br = Lhbst @ B
         # Called during `GeneralizedQuadBTReductor.Hbar`
-        return self.sample_sfcascade(sl)
+        return self.samples_for_Lbar_Mbar(sl)
 
-    def sample_rsf(self, sr):
+    def samples_for_Gbar(self, sr):
         # Artifcially sample the relevant rsf, here this is just :math: `G(s)`
         # In QuadBST, these samples are used in building the reduced Cr = C @ Ubst
         # Called during `GeneralizedQuadBTReductor.Gbar`
         return self.sampleG(sr)
 
-    def sample_sfcascade(self, s):
+    def samples_for_Lbar_Mbar(self, s):
         # Artifcially sample the system cascade
         #   ..math: `H(s) : = [(W(-s).T)^{-1} * G(s)]_+ = C_lsf * (s * I - A) \ B`
         # _+ denotes the stable part of the transfer function
