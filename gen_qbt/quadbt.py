@@ -210,7 +210,7 @@ class GeneralizedQuadBTReductor(object):
 
     # Key BT quantities from relevant data are computed once then cached, can be recycled for different orders of reduction
     @cached_property
-    def Lbar_Mbar(self):  
+    def Lbar_Mbar(self):
         # Used in computing A_r = W_r.T @ Mbar @ V_r and _, hsvbar, _ = svd(Lbar)
         if self.typ == "quadbrbt":
             raise NotImplementedError
@@ -610,12 +610,14 @@ class QuadBSTSampler(GenericSampleGenerator):
             Hs[j, :, :] = self.C_lsf @ np.linalg.solve((sj * self.I - self.A), self.B)
 
         return Hs
-    
-#     _               _   _   _ ___ 
-#    / \      _.  _| |_) |_) |_) |  
-#    \_X |_| (_| (_| |_) | \ |_) |  
-#                                  
-    
+
+
+#     _               _   _   _ ___
+#    / \      _.  _| |_) |_) |_) |
+#    \_X |_| (_| (_| |_) | \ |_) |
+#
+
+
 class QuadBRBTSampler(GenericSampleGenerator):
     """Class to generate relevant transfer function samples for use in Quadrature-Based Bounded-real Balanced Truncation (QuadBRBT)
 
@@ -629,7 +631,6 @@ class QuadBRBTSampler(GenericSampleGenerator):
         super().__init__(A, B, C, D)
         self.R_B = np.eye(self.p) - self.D @ self.D.T
         self.R_C = np.eye(self.m) - self.D.T @ self.D
-        # TODO: Stopping here for now
         if self.m > 1:  # MIMO case
             # If R_C is not invertible, neither is R_B
             if not np.all(np.linalg.eigvals(self.R_C) > 0):
