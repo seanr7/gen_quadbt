@@ -580,22 +580,19 @@ class QuadBSTSampler(GenericSampleGenerator):
         # Called during computing approximate square-root factors
         return self.B
 
-    # TODO: Change names below to something more informative... e.g.
-    # `samples_for_Hbar` ---> `samples_for_Hbar` or `samples_for_Br`
-    # `samples_for_Gbar` ---> `samples_for_Gbar` or `samples_for_Cr`
-    # `samples_for_Lbar_Mbar` ---> `samples_for_Lbar_Mbar` or `samples_for_Er_Ar`
-    # And update function descriptions...
-
     def samples_for_Hbar(self, sl):
-        # In QuadBST, this returns samples of the spectral factor cascade
-        # This function is included to maintain generality in the reductor class
-        # Used in building the reduced Br = Lhbst @ B
+        # Artifcially sample the system cascade
+        #   ..math: `H(s) : = [(W(-s).T)^{-1} * G(s)]_+ = C_lsf * (s * I - A) \ B`
+        # _+ denotes the stable part of the transfer function
+        # Returns self.samples_for_Lbar_Mbar(sl) for generality
+        # Used in building Hbar = Lh_bst @ B from data
         # Called during `GeneralizedQuadBTReductor.Hbar`
         return self.samples_for_Lbar_Mbar(sl)
 
     def samples_for_Gbar(self, sr):
-        # Artifcially sample the relevant rsf, here this is just :math: `G(s)`
-        # In QuadBST, these samples are used in building the reduced Cr = C @ Ubst
+        # Artifcially sample the relevant rsf, here this is just :math: `G(s)` s.t.
+        #   ..math: `G(s) @ G(-s).T = W(-s).T @ W(s)`
+        # Used in building Gbar = C @ U_bst from data
         # Called during `GeneralizedQuadBTReductor.Gbar`
         return self.sampleG(sr)
 
@@ -603,7 +600,8 @@ class QuadBSTSampler(GenericSampleGenerator):
         # Artifcially sample the system cascade
         #   ..math: `H(s) : = [(W(-s).T)^{-1} * G(s)]_+ = C_lsf * (s * I - A) \ B`
         # _+ denotes the stable part of the transfer function
-        # In QuadPRBT, these samples are used in building the reduced Ar = Lprbt.T * A * Uprbt and approximate Hankel singular values
+        # Used in building the reduced Lbar = Lh_bst @ U_bst and Hbar = Lh_bst @ A @ U_bst from daya
+        # Called during `GeneralizedQuadBTReductor.Lbar_Mbar`
 
         Hs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
         for j, sj in enumerate(s):
