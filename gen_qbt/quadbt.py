@@ -210,10 +210,12 @@ class GeneralizedQuadBTReductor(object):
 
     # Key BT quantities from relevant data are computed once then cached, can be recycled for different orders of reduction
     @cached_property
-    def Lbar_Mbar(self):
+    def Lbar_Mbar(self):  
+        # Used in computing A_r = W_r.T @ Mbar @ V_r and _, hsvbar, _ = svd(Lbar)
         if self.typ == "quadbrbt":
             raise NotImplementedError
-        elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
+        else:
+            # Using samples C_lsf @ (s * I - A) \ B_rsf
             return self._Lbar_Mbar(
                 self.modesl,
                 self.modesr,
@@ -225,19 +227,19 @@ class GeneralizedQuadBTReductor(object):
 
     @cached_property
     def Gbar(self):
-        # Used in replacing C with Gbar = C * U from data
+        # Used in computing C_r = Gbar @ V_r
         if self.typ == "quadbrbt":
             raise NotImplementedError
-        elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
+        else:
             # Using samples C * (s * I - A) \ B_rsf
             return self._Gbar(self.sampler.samples_for_Gbar(self.modesr), self.weightsr)
 
     @cached_property
     def Hbar(self):
-        # Used in replacing B with Hbar = Lh * B from data
+        # Used in computing B_r = W_r.T @ B
         if self.typ == "quadbrbt":
             raise NotImplementedError
-        elif self.typ in ("quadbt", "quadprbt", "quadbst", "quadfwbt"):
+        else:
             # Using samples C_lsf * (s * I - A) \ B
             return self._Hbar(self.sampler.samples_for_Hbar(self.modesl), self.weightsl)
 
@@ -464,13 +466,13 @@ class QuadPRBTSampler(GenericSampleGenerator):
     @cached_property
     def C_lsf(self):
         # Output matrix of left spectral factor (lsf) of the Popov function
-        #   ..math: `G(s) = G(s) + G(-s).T = M(-s).T*M(s)`
+        #   ..math: `Phi(s) = G(s) + G(-s).T = M(-s).T*M(s)`
         return self.R_invsqrt @ (self.C - (self.B.T @ self.Q))
 
     @cached_property
     def B_rsf(self):
         # Input matrix of right spectral factor (rsf) of the Popov function
-        #   ..math: `G(s) = G(s) + G(-s).T = N(s)*N(-s).T`
+        #   ..math: `Phi(s) = G(s) + G(-s).T = N(s)*N(-s).T`
         return (self.B - (self.P @ self.C.T)) @ self.R_invsqrt
 
     def samples_for_Hbar(self, sl):
@@ -608,6 +610,123 @@ class QuadBSTSampler(GenericSampleGenerator):
             Hs[j, :, :] = self.C_lsf @ np.linalg.solve((sj * self.I - self.A), self.B)
 
         return Hs
+    
+#     _               _   _   _ ___ 
+#    / \      _.  _| |_) |_) |_) |  
+#    \_X |_| (_| (_| |_) | \ |_) |  
+#                                  
+    
+class QuadBRBTSampler(GenericSampleGenerator):
+    """Class to generate relevant transfer function samples for use in Quadrature-Based Bounded-real Balanced Truncation (QuadBRBT)
+
+    Paramters
+    ---------
+    A, B, C, D
+        State-space realization of the FOM, all matrices are |Numpy Arrays| of size (n, n), (n, m), (p, n), and (p, m) respectively
+    """
+
+    def __init__(self, A, B, C, D):
+        super().__init__(A, B, C, D)
+        self.R_B = np.eye(self.p) - self.D @ self.D.T
+        self.R_C = np.eye(self.m) - self.D.T @ self.D
+        # TODO: Stopping here for now
+        if self.m > 1:  # MIMO case
+            # If R_C is not invertible, neither is R_B
+            if not np.all(np.linalg.eigvals(self.R_C) > 0):
+                raise ValueError("System must be bounded real")
+            self.R_Cinv = np.linalg.solve(self.R_C, np.eye(self.m))
+            self.R_Cinvsqrt = np.linalg.cholesky(self.R_Cinv)
+        else:  # SISO case
+            if not (self.R_C > 0):
+                raise ValueError("System must be bounded real")
+            self.R_Cinv = 1 / self.R_C
+            self.R_Cinvsqrt = np.sqrt(self.R_Cinv)
+        if self.p > 1:  # MIMO case
+            # If R_C is not invertible, neither is R_C
+            if not np.all(np.linalg.eigvals(self.R_B) > 0):
+                raise ValueError("System must be bounded real")
+            self.R_Binv = np.linalg.solve(self.R_B, np.eye(self.p))
+            self.R_Binvsqrt = np.linalg.cholesky(self.R_Binv)
+        else:  # SISO case
+            if not (self.R_B > 0):
+                raise ValueError("System must be bounded real")
+            self.R_Binv = 1 / self.R_B
+            self.R_Binvsqrt = np.sqrt(self.R_Binv)
+
+    @cached_property
+    def Q(self):
+        # Solve + cache ARE
+        #   :math: A.T * Qbrbt + Qbrbt * A + C.T * C + (B.T * Qbrbt + D.T * C).T * R_Cinv * (B.T * Qbrbt + D.T * C) = 0
+        return sp.linalg.solve_continuous_are(
+            self.A, self.B, self.C.T @ self.C, -1 * (self.R_C), self.I, self.C.T @ self.D
+        )
+
+    @cached_property
+    def P(self):
+        # Solve + cache ARE
+        #   :math: A * Pbrbt + Pbrbt * A.T + B * B.T + (Pbrbt * C.T + B * D.T) * R_Binv * (Pbrbt * C.T + B * D.T).T = 0
+        return sp.linalg.solve_continuous_are(
+            self.A, self.C.T, self.B @ self.B.T, -1 * (self.R_B), self.I, self.B @ self.D.T
+        )
+
+    @cached_property
+    def C_lsf(self):
+        # Output matrix of left spectral factor (lsf) such that
+        #   ..math: `I_m - G(-s).T * G(s) = M(-s).T * M(s)`
+        return -(self.R_Cinvsqrt @ ((self.B.T @ self.Q) + (self.D.T @ self.C)))
+
+    @cached_property
+    def B_rsf(self):
+        # Output matrix of right spectral factor (rsf) such that
+        #   ..math: `I_p - G(s) * G(-s).T = N(s) * N(-s).T`
+        return -((self.P @ self.C.T) + (self.B + self.D.T)) * self.R_Binvsqrt
+
+    def samples_for_Hbar(self, sl):
+        # Artifcially sample the (strictly proper part) of the left spectral factor (lsf) such that
+        #   ..math: `I_m - G(-s).T * G(s) = M(-s).T * M(s)`
+        # :math: `M(s)` is an m x m rational transfer function...
+        # ... and artificially sample G(s)
+        # In QuadBRBT, these samples are used in building Hbar = Lh_brbt @ B from data
+        # Called during `GeneralizedQuadBTReductor.Hbar`
+
+        Ms = np.zeros([np.shape(sl)[0], self.m, self.m], dtype="complex_")
+        for k, sl_k in enumerate(sl):
+            Ms[k, :, :] = self.C_lsf @ np.linalg.solve((sl_k * self.I - self.A), self.B)
+
+        # Returns samples of the spectral factor, as well as G(s)
+        return Ms, self.sampleG(sl)
+
+    def samples_for_Gbar(self, sr):
+        # Artifcially sample the (strictly proper part) of the right spectral factor (rsf) such that
+        #   ..math: `I_p - G(s) * G(-s).T = N(s) * N(-s).T``
+        # :math: `N(s)` is a p x p rational transfer function...
+        # ... and artificially sample G(s)
+        # In QuadBRBT, these samples are used in building Gbar = C @ U_brbt from data
+        # Called during `GeneralizedQuadBTReductor.Hbar`
+
+        Ns = np.zeros([np.shape(sr)[0], self.m, self.m], dtype="complex_")
+        for j, sr_j in enumerate(sr):
+            Ns[j, :, :] = self.C @ np.linalg.solve((sr_j * self.I - self.A), self.B_rsf)
+
+        # Returns samples of the spectral factor, as well as G(s)
+        return Ns, self.sampleG(sr)
+
+    def samples_for_Lbar_Mbar(self, s):
+        # Artifcially sample the system cascade
+        #   ..math: `H(s) : = [M(s) * (N(-s).T)^{-1}]_+ = C_lsf * (s * I - A) \ B_rsf`
+        # _+ denotes the stable part of the transfer function...
+        # ... also artificially sample G(s), M(s), and N(s0)
+        # In QuadBRBT, these samples are used in building Lbar = Lh_brbt @ U_brbt and Mbar = Lh_brbt @ A @ U_brbt
+        # Called during `GeneralizedQuadBTReductor.Lbar_Mbar`
+
+        Hs = np.zeros([np.shape(s)[0], self.m, self.m], dtype="complex_")
+        for j, sj in enumerate(s):
+            Hs[j, :, :] = self.C_lsf @ np.linalg.solve((sj * self.I - self.A), self.B_rsf)
+
+        # Returns samples of the cascade, G(s), M(s), N(s)
+        Ns, _ = self.samples_for_Gbar(s)
+        Ms, _ = self.samples_for_Hbar(s)
+        return Hs, Ns, Ms, self.sampleG(s)
 
 
 def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
