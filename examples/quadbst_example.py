@@ -8,7 +8,6 @@ import scipy as sp
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from gen_qbt.quadbt import QuadBSTSampler, GeneralizedQuadBTReductor, trapezoidal_rule
-from models import abc_mimo_mass_spring_damper
 
 # Result is a dict with matrices stored as Keys
 # Use `print(sorted(iss.keys()))` to see the stored keys

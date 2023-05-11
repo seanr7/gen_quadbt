@@ -213,7 +213,23 @@ class GeneralizedQuadBTReductor(object):
     def Lbar_Mbar(self):
         # Used in computing A_r = W_r.T @ Mbar @ V_r and _, hsvbar, _ = svd(Lbar)
         if self.typ == "quadbrbt":
-            raise NotImplementedError
+            Hsl, Nsl, Msl, Gsl = self.sampler.samples_for_Lbar_Mbar(self.modesl)
+            Hsr, Nsr, Msr, Gsr = self.sampler.samples_for_Lbar_Mbar(self.modesr)
+            Lbar11, Mbar11 = self._Lbar_Mbar(
+                self.modesl, self.modesr, Gsl, Gsr, self.weightsl, self.weightsr
+            )
+            Lbar12, Mbar12 = self._Lbar_Mbar(
+                self.modesl, self.modesr, Nsl, Nsr, self.weightsl, self.weightsr
+            )
+            Lbar21, Mbar21 = self._Lbar_Mbar(
+                self.modesl, self.modesr, Msl, Msr, self.weightsl, self.weightsr
+            )
+            Lbar22, Mbar22 = self._Lbar_Mbar(
+                self.modesl, self.modesr, Hsl, Hsr, self.weightsl, self.weightsr
+            )
+            Lbar = np.c_[np.r_[Lbar11, Lbar21], np.r_[Lbar12, Lbar22]]
+            Mbar = np.c_[np.r_[Mbar11, Mbar21], np.r_[Mbar12, Mbar22]]
+            return Lbar, Mbar
         else:
             # Using samples C_lsf @ (s * I - A) \ B_rsf
             return self._Lbar_Mbar(
@@ -229,7 +245,11 @@ class GeneralizedQuadBTReductor(object):
     def Gbar(self):
         # Used in computing C_r = Gbar @ V_r
         if self.typ == "quadbrbt":
-            raise NotImplementedError
+            Nsr, Gsr = self.sampler.samples_for_Gbar(self.modesr)
+            Gbar1 = self._Gbar(Gsr, self.weightsr)
+            Gbar2 = self._Gbar(Nsr, self.weightsr)
+            Gbar = np.c_[Gbar1, Gbar2]
+            return Gbar
         else:
             # Using samples C * (s * I - A) \ B_rsf
             return self._Gbar(self.sampler.samples_for_Gbar(self.modesr), self.weightsr)
@@ -238,7 +258,11 @@ class GeneralizedQuadBTReductor(object):
     def Hbar(self):
         # Used in computing B_r = W_r.T @ B
         if self.typ == "quadbrbt":
-            raise NotImplementedError
+            Msl, Gsl = self.sampler.samples_for_Hbar(self.modesl)
+            Hbar1 = self._Hbar(Gsl, self.weightsl)
+            Hbar2 = self._Hbar(Msl, self.weightsl)
+            Hbar = np.r_[Hbar1, Hbar2]
+            return Hbar
         else:
             # Using samples C_lsf * (s * I - A) \ B
             return self._Hbar(self.sampler.samples_for_Hbar(self.modesl), self.weightsl)
@@ -340,7 +364,7 @@ class GenericSampleGenerator(object):
 
     def right_sqrt_fact_U(self, sr, weightsr):
         # Return approximate quadrature-based sqrt factor
-        #   ..math: `Pprbt \approx U * Uh,  U \in \C^{n \times (Nr * m)}`
+        #   ..math: `P ~ U * Uh,  U \in \C^{n \times (Nr * m)}`
         # Used in checking error of the implicity quadrature rule
         assert np.shape(sr)[0] == np.shape(weightsr)[0]
         U = np.zeros([np.shape(sr)[0], self.n, self.m], dtype="complex_")
@@ -350,9 +374,8 @@ class GenericSampleGenerator(object):
         return np.concatenate(U, axis=1)
 
     def left_sqrt_fact_Lh(self, sl, weightsl):
-        # TODO: Move to Parent class, and add redundant self.C_lsf, self.B_rsf, etc. to reduce redundancy in the codes
         # Return approximate quadrature-based sqrt factor
-        #   ..math: `Qprbt \approx L * Lh,  Lh \in \C^{(p * Nl) \times n}`
+        #   ..math: `Q ~ L * Lh,  Lh \in \C^{(p * Nl) \times n}`
         # Used in checking error of the implicity quadrature rule
         assert np.shape(sl)[0] == np.shape(weightsl)[0]
         Lh = np.zeros([np.shape(sl)[0], self.p, self.n], dtype="complex_")
@@ -680,7 +703,7 @@ class QuadBRBTSampler(GenericSampleGenerator):
     def B_rsf(self):
         # Output matrix of right spectral factor (rsf) such that
         #   ..math: `I_p - G(s) * G(-s).T = N(s) * N(-s).T`
-        return -((self.P @ self.C.T) + (self.B + self.D.T)) * self.R_Binvsqrt
+        return -((self.P @ self.C.T) + (self.B @ self.D.T)) @ self.R_Binvsqrt
 
     def samples_for_Hbar(self, sl):
         # Artifcially sample the (strictly proper part) of the left spectral factor (lsf) such that
@@ -728,6 +751,36 @@ class QuadBRBTSampler(GenericSampleGenerator):
         Ns, _ = self.samples_for_Gbar(s)
         Ms, _ = self.samples_for_Hbar(s)
         return Hs, Ns, Ms, self.sampleG(s)
+
+    def right_sqrt_fact_U(self, sr, weightsr):
+        # TODO: Option to do different quadrature rules
+        # Return approximate quadrature-based sqrt factors
+        #   ..math: `P ~ U * Uh + U_N * U_Nh,  U, U_N \in \C^{n \times (Nr * m)}`
+        # Used in checking error of the implicity= quadrature rule
+        assert np.shape(sr)[0] == np.shape(weightsr)[0]
+        U = np.zeros([np.shape(sr)[0], self.n, self.m], dtype="complex_")
+        U_N = np.zeros([np.shape(sr)[0], self.n, self.m], dtype="complex_")
+        for j, sr_j in enumerate(sr):
+            U[j, :, :] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B)
+            U_N[j, :, :] = weightsr[j] * np.linalg.solve((sr_j * self.I - self.A), self.B_rsf)
+        # Actual quadrature factor is [U, U_N]
+        return np.c_[np.concatenate(U, axis=1), np.concatenate(U_N, axis=1)]
+
+    def left_sqrt_fact_Lh(self, sl, weightsl):
+        # TODO: Option to do different quadrature rules
+        # Return approximate quadrature-based sqrt factors, applied to both Gramians
+        #   ..math: `Q ~ L * Lh + L_M * L_Mh,  Lh, L_Mh \in \C^{(p * Nl) \times n}`
+        # Used in checking error of the implicity= quadrature rule
+        assert np.shape(sl)[0] == np.shape(weightsl)[0]
+        Lh = np.zeros([np.shape(sl)[0], self.p, self.n], dtype="complex_")
+        L_Mh = np.zeros([np.shape(sl)[0], self.p, self.n], dtype="complex_")
+        for k, sl_k in enumerate(sl):
+            Lh[k, :, :] = weightsl[k] * (self.C @ np.linalg.solve((sl_k * self.I - self.A), self.I))
+            L_Mh[k, :, :] = weightsl[k] * (
+                self.C_lsf @ np.linalg.solve((sl_k * self.I - self.A), self.I)
+            )
+        # Actual quadrature factor is [Lh; L_Mh]
+        return np.r_[np.concatenate(Lh, axis=0), np.concatenate(L_Mh, axis=0)]
 
 
 def trapezoidal_rule(exp_limits=np.array((-3, 3)), N=100, ordering="interlace"):
