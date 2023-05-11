@@ -9,30 +9,36 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from gen_qbt.quadbt import QuadBRBTSampler, GeneralizedQuadBTReductor, trapezoidal_rule
 from pymor.models.iosys import LTIModel
+from models import abc_mimo_mass_spring_damper
 
 # Result is a dict with matrices stored as Keys
 # Use `print(sorted(iss.keys()))` to see the stored keys
 heat = loadmat("benchmarks/heat-cont.mat")
-# iss = loadmat("benchmarks/iss.mat")
+iss = loadmat("benchmarks/iss.mat")
 # print(sorted(iss.keys()))
 # Convert sparse matrices to np arrays
-# A = iss["A"].toarray()  # (270, 270)
-# B = iss["B"].toarray()  # (270, 3)
-# C = iss["C"].toarray()  # (3, 270)
-# n = 270
-A = heat["A"].toarray()  # (200, 200)
-B = heat["B"].toarray()  # (200, 1)
-C = heat["C"].toarray()  # (1, 200)
-n = 200
+A = iss["A"].toarray()  # (270, 270)
+B = iss["B"].toarray()  # (270, 3)
+C = iss["C"].toarray()  # (3, 270)
+n = 270
+m = 3
+# A = heat["A"].toarray()  # (200, 200)
+# B = heat["B"].toarray()  # (200, 1)
+# C = heat["C"].toarray()  # (1, 200)
+# n = 200
 # Enforce SISO below (if desired-)
 # B = B[:, 0]
 # B = B[:, np.newaxis]
 # C = C[0, :]
 # C = C[np.newaxis]
+
+# n = 50
+# A, B, C = abc_mimo_mass_spring_damper(n, 4, 4, 1)
 # Add some input-output feedback
+# m = 2
 eps = 1e-3
-# D = np.eye(3) * eps
-D = np.array(eps, ndmin=2)
+D = np.eye(m) * eps
+# D = np.array(eps, ndmin=2)
 
 # To compute Hinf norm... use pymor
 ss = LTIModel.from_matrices(A, B, C, D)
@@ -49,7 +55,7 @@ print(normalized_ss.hinf_norm())
 # Check quadrature error
 # First, compute weights/modes via Trapezoidal rule
 modesl, modesr, weightsl, weightsr = trapezoidal_rule(
-    exp_limits=np.array((-4, 4)), N=1000, ordering="interlace"
+    exp_limits=np.array((-4, 4)), N=400, ordering="interlace"
 )
 
 BRBT_sampler = QuadBRBTSampler(A, B, C, D)

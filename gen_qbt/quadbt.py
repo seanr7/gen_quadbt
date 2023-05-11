@@ -690,7 +690,7 @@ class QuadBRBTSampler(GenericSampleGenerator):
         # Solve + cache ARE
         #   :math: A * Pbrbt + Pbrbt * A.T + B * B.T + (Pbrbt * C.T + B * D.T) * R_Binv * (Pbrbt * C.T + B * D.T).T = 0
         return sp.linalg.solve_continuous_are(
-            self.A, self.C.T, self.B @ self.B.T, -1 * (self.R_B), self.I, self.B @ self.D.T
+            self.A.T, self.C.T, self.B @ self.B.T, -1 * (self.R_B), self.I, self.B @ self.D.T
         )
 
     @cached_property
