@@ -21,16 +21,18 @@ A = iss["A"].toarray()  # (270, 270)
 B = iss["B"].toarray()  # (270, 3)
 C = iss["C"].toarray()  # (3, 270)
 n = 270
-m = 3
+# m = 3
 # A = heat["A"].toarray()  # (200, 200)
 # B = heat["B"].toarray()  # (200, 1)
 # C = heat["C"].toarray()  # (1, 200)
+# m = 1
 # n = 200
 # Enforce SISO below (if desired-)
-# B = B[:, 0]
-# B = B[:, np.newaxis]
-# C = C[0, :]
-# C = C[np.newaxis]
+B = B[:, 0]
+B = B[:, np.newaxis]
+C = C[0, :]
+C = C[np.newaxis]
+m = 1
 
 # n = 50
 # A, B, C = abc_mimo_mass_spring_damper(n, 4, 4, 1)
@@ -55,7 +57,7 @@ print(normalized_ss.hinf_norm())
 # Check quadrature error
 # First, compute weights/modes via Trapezoidal rule
 modesl, modesr, weightsl, weightsr = trapezoidal_rule(
-    exp_limits=np.array((-4, 4)), N=400, ordering="interlace"
+    exp_limits=np.array((-3, 3)), N=400, ordering="interlace"
 )
 
 BRBT_sampler = QuadBRBTSampler(A, B, C, D)
@@ -95,7 +97,12 @@ print("Error in hsvs", np.linalg.norm(hsv - QuadBRBTEngine.hsvbar()[:n]))
 phi = (np.sqrt(5) + 1) / 2
 plt.axes([0.125, 0.15, 0.75, phi - 1])
 x = np.arange(n)  # x is 1:n
-plt.semilogy(x, hsv, "o")
-plt.semilogy(x, QuadBRBTEngine.hsvbar()[:n], "*")
+plt.semilogy(x, hsv, "o", markersize=3, label="True HSVs")
+plt.semilogy(x, QuadBRBTEngine.hsvbar()[:n], "*", markersize=3, label="Approximate HSVs")
+plt.legend(["True HSVs", "Approximate HSVs"], loc="upper right")
+plt.rcParams[r"text.usetex"] = True
+plt.xlabel("Index $k$")
+plt.ylabel("$\sigma_k$")
+plt.grid()
 plt.show()
 # if __name__ == "__main__":
