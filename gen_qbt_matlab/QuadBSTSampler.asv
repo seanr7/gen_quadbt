@@ -1,0 +1,37 @@
+classdef QuadBSTSampler < GenericSampler & handle
+    % Inherits GenericSampler class
+    properties 
+        Dinv % For inverse of D; guaranteed nonsingular 
+        P    % Reachability Gramian of G(s)\
+        Q    % Observability Gramian of W(s)
+    end
+    
+    methods
+        function obj = QuadBSTSampler(A, B, C, D)
+            % Call to Super
+            obj@GenericSampler(A, B, C, D)
+            if obj.m ~= obj.p
+                error('G(s) must be square! (m == p)')
+            end
+            if any(rank(obj.D) ~= obj.m)
+                error('D must be ')
+            end
+            % Pre-compute Dinv
+            obj.Dinv = obj.D \ eye(obj.m, obj.m);
+        end
+
+        function P_ = get.P(obj)
+            % Getter method for P
+            % If not previously set, will solve for P 
+            % Solve the reachability ALE of G(s)
+            %   A * P + P * A' + B * B' = 0
+            if isempty(obj.P)
+                disp("Computing the reachability Gramian, P, of G(s)")
+                obj.P = lyap(obj.A, obj.B * obj.B');
+            else
+                disp('Returning the reachability Gramian, P, of G(s)')
+            end
+            P_ = obj.P;
+        end
+    end
+end
