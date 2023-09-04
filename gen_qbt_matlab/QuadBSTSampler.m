@@ -74,9 +74,9 @@ classdef QuadBSTSampler < GenericSampler & handle
             if isempty(obj.Q)
                 disp("Computing the observability Gramian, Q, of W(s)")
                 % Solve the observability ARE of W(s)
-                %   A' * Q + Q * A + (C - B_W' * Q)'* (D * D')^{-1} * (C - B_W' * X) = 0
+                %   A' * Q + Q * A + (C - B_W' * Q)'* (D * D')^{-1} * (C - B_W' * Q) = 0
                 % Fit the above to MATLAB's `icare(A, B, X, R, S, E, G)', that solves:
-                %   A' * Q * E + E' * Q * A + E' * Q * G * Q * E - (E' * Q * B + S)* Rinv *(B' * X * E + S') + X = 0
+                %   A' * Q * E + E' * Q * A + E' * Q * G * Q * E - (E' * Q * B + S) * Rinv * (B' * Q * E + S') + X = 0
                 [obj.Q, ~, ~] = icare(obj.A, -obj.B_W, zeros(obj.n, obj.n), -(obj.D * obj.D'), obj.C', obj.I, zeros(obj.n, obj.n));
             end
             Q_ = obj.Q;
@@ -133,15 +133,15 @@ classdef QuadBSTSampler < GenericSampler & handle
         end
 
         function rsf_samples = samples_for_Gbar(obj, s)
-            % Artificially sample the appropriate rsf to obtain samples for Gbar = C * U_bst;
-            % Here, this is just G(s), i.e.
+            % Artificially sample the appropriate rsf to obtain samples for Gbar = C * Utilde;
+            % Here, this is just G_infty(s), i.e. s.t.
             %   G(s) * G(-s).T = W(-s).T * W(s)
             % Gbar used in building the reduced-order Cr
             rsf_samples = obj.sampleG(s); % Call to parent class
         end
 
         function lsf_samples = samples_for_Hbar(obj, s)
-            % Artificially sample the appropriate lsf to obtain samples for Hbar = L_bst' * B;
+            % Artificially sample the appropriate lsf to obtain samples for Hbar = Ltilde' * B;
             % Here, this is the system cascade
             %   F(s) := [(W(-s).T^{-1}) * G(s)]_+ = C_lsf * (s * I - A) \ B
             % Hbar used in building the reduced-order Brr
@@ -151,7 +151,7 @@ classdef QuadBSTSampler < GenericSampler & handle
         end
 
         function cascade_samples = samples_for_Lbar_Mbar(obj, s)
-            % Artificially sample the appropriate system cascade to obtain samples for Lbar = L_bst' * U_bst; Mbar = L_bst' * A * U_bst;
+            % Artificially sample the appropriate system cascade to obtain samples for Lbar = Ltilde' * Utilde; Mbar = Ltilde' * A * Utilde;
             % Here, this is the system cascade
             %   F(s) := [(W(-s).T^{-1}) * G(s)]_+ = C_lsf * (s * I - A) \ B
             % Lbar used in computing approximate singular values; Mbar used in building the reduced-order Ar
