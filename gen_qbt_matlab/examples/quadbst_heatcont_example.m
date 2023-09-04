@@ -132,7 +132,7 @@ figure
 % Make aspect ration `golden'
 golden_ratio = (sqrt(5)+1)/2;
 axes('position', [.125 .15 .75 golden_ratio-1])
-semilogy(1:max_x, stoch_hsvs(1:max_x), 'o', LineWidth=1.5)
+semilogy(1:max_x, stoch_hsvs(1:max_x), 'o', LineWidth=1.5,MarkerSize=10)
 hold on
 semilogy(1:max_x, hsvbar_20(1:max_x), '*', LineWidth=1.5)
 semilogy(1:max_x, hsvbar_40(1:max_x), 'x', LineWidth=1.5)
@@ -142,9 +142,74 @@ ylabel('$\sqrt{\lambda_k(\mathbf{P}\mathbf{Q}_{\mathcal{W}})}$', 'interpreter','
 xlabel('$k$', 'interpreter','latex')
 legend('True', 'Approximate, $N = 20$', 'Approximate, $N = 40$', 'Approximate, $N = 80$', 'interpreter','latex')
 
-display('Frobenius norm error of the approximate Stochastic HSVs; 10 nodes')
-norm(diag(hsvbar_40(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
 display('Frobenius norm error of the approximate Stochastic HSVs; 20 nodes')
-norm(diag(hsvbar_40(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
+norm(diag(hsvbar_20(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
 display('Frobenius norm error of the approximate Stochastic HSVs; 40 nodes')
+norm(diag(hsvbar_40(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
+display('Frobenius norm error of the approximate Stochastic HSVs; 80 nodes')
 norm(diag(hsvbar_80(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
+
+%% 4. Now, reduction error
+FOM = ss(A, B, C, D); % FOM
+Drbar = D; % d unchanged, always
+sysnorm = norm(FOM, 'inf');
+
+% Allocate space
+testcases = 7;
+BST_errors = zeros(testcases,1);   QBST_20_errors = zeros(testcases,1); 
+QBST_40_errors = zeros(testcases,1);    QBST_80_errors = zeros(testcases,1);
+for k = 1:testcases % orders to test
+    r = 2*k; % reduction order
+    [Arbar_20, Brbar_20, Crbar_20] = GQBT_Engine_20.reduce(r);
+    [Arbar_40, Brbar_40, Crbar_40] = GQBT_Engine_40.reduce(r);
+    [Arbar_80, Brbar_80, Crbar_80] = GQBT_Engine_80.reduce(r);
+    opts = ml_morlabopts('ml_ct_ss_bt');
+    opts.Order = r;
+    opts.OrderComputation = 'Order';
+    [Ar, Br, Cr, Dr, output_opts] = ml_ct_ss_bst(A, B, C, D, opts);
+        
+    BST_ROM = ss(Ar, Br, Cr, Dr);
+    QBST_ROM_20 = ss(Arbar_20, Brbar_20, Crbar_20, Drbar);
+    QBST_ROM_40 = ss(Arbar_40, Brbar_40, Crbar_40, Drbar);
+    QBST_ROM_80 = ss(Arbar_80, Brbar_80, Crbar_80, Drbar);
+
+    BST_errors(k, 1) = norm(FOM-BST_ROM, 'inf')/sysnorm;
+%     fprintf("Error in quadprbt")
+%     norm(sys-sysrbar, 'inf')
+    QBST_20_errors(k, 1) = norm(FOM-QBST_ROM_20, 'inf')/sysnorm;
+    QBST_40_errors(k, 1) = norm(FOM-QBST_ROM_40, 'inf')/sysnorm;
+    QBST_80_errors(k, 1) = norm(FOM-QBST_ROM_80, 'inf')/sysnorm;
+end
+
+% New style (yoinked form Victor)
+
+ColMat = zeros(5,3);
+
+%ColMat(1,:) = [1 0.6 0.4];
+ColMat(1,:) = [ 0.8500    0.3250    0.0980];
+ColMat(2,:) = [0.3010    0.7450    0.9330];
+ColMat(3,:) = [  0.9290    0.6940    0.1250];
+%ColMat(3,:) = [1 0.4 0.6];
+ColMat(4,:) = [0.4660    0.6740    0.1880];
+ColMat(5,:) = [0.4940    0.1840    0.5560];
+
+
+figure
+% Make aspect ration `golden'
+golden_ratio = (sqrt(5)+1)/2;
+axes('position', [.125 .15 .75 golden_ratio-1])
+
+semilogy([2:2:2*testcases], BST_errors,'ms','color',ColMat(1,:),'markersize',15,LineWidth=1.5);hold on;
+semilogy([2:2:2*testcases], QBST_20_errors,'-.r','color',ColMat(2,:),LineWidth=1.5);
+semilogy([2:2:2*testcases], QBST_40_errors,'-.g<','color',ColMat(3,:),LineWidth=1.5);
+semilogy([2:2:2*testcases], QBST_80_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
+
+legend('PGRoM BST', 'QBST, $N = 20$', 'QBST, $N = 40$', 'QBST, $N = 80$', 'interpreter','latex')
+
+% semilogy([2:2:2*testcases], BST_errors, '-s', Markersize = 10, LineWidth=1.5)
+% hold on
+% % grid on
+% semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
+% set(gca,'fontsize',12)
+xlabel('$r$, reduction order', 'interpreter','latex')
+ylabel('$\|\mathcal{G}-\mathcal{G}_r\|_{\mathcal{H}_\infty}/\|\mathcal{G}\|_{\mathcal{H}_\infty}$', 'interpreter','latex')

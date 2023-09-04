@@ -112,7 +112,10 @@ classdef GeneralizedQuadBTReductor < handle
         function [Zbar_, Sbar_, Ybar_] = svd_from_data(obj) 
             % Compute approximate SVD of Lbar = Ltilde' * Utilde
             % At first call, this saves the approximate svd of Lbar with instance of the class
-            [obj.Zbar, obj.Sbar, obj.Ybar_] = svd(obj.Lbar, 'econ');
+            if isempty(obj.Zbar)
+                disp('Computing the SVD of Lbar')
+                [obj.Zbar, obj.Sbar, obj.Ybar] = svd(obj.Lbar, 'econ');
+            end
             Zbar_ = obj.Zbar;   Sbar_ = obj.Sbar;  Ybar_ = obj.Ybar;
         end
 
@@ -127,13 +130,13 @@ classdef GeneralizedQuadBTReductor < handle
             hsvbar_ = obj.hsvbar;
         end
 
-        function Arbar, Brbar, Crbar = reduce(obj, r)
+        function [Arbar, Brbar, Crbar] = reduce(obj, r)
             % Perform reduction; order 1 \leq r < nn
             % ROM via PG-projection to approximate SBT; Dr := D is unchanged in ROM
-            [Zbar, Sbar, Ybar] = obj.svd_from_data;
-            Arbar = Sbar(1 : r, 1 : r)^(-1/2) * Zbar(:, 1 : r)' * obj.Mbar * Ybar(:, 1 : r) * Sbar(1 : r, 1 : r)^(-1/2);
-            Brbar = Sbar(1 : r, 1 : r)^(-1/2) * Zbar(:, 1 : r)' * obj.Hbar;
-            Crbar = obj.Gbar * Ybar(:, 1 : r) * Sbar(1 : r, 1 : r)^(-1/2);
+            [~, ~, ~] = obj.svd_from_data; % This computes approximate SVD, saves with class
+            Arbar = obj.Sbar(1 : r, 1 : r)^(-1/2) * obj.Zbar(:, 1 : r)' * obj.Mbar * obj.Ybar(:, 1 : r) * obj.Sbar(1 : r, 1 : r)^(-1/2);
+            Brbar = obj.Sbar(1 : r, 1 : r)^(-1/2) * obj.Zbar(:, 1 : r)' * obj.Hbar;
+            Crbar = obj.Gbar * obj.Ybar(:, 1 : r) * obj.Sbar(1 : r, 1 : r)^(-1/2);
         end
 
     end                               
