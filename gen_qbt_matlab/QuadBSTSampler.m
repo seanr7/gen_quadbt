@@ -62,7 +62,7 @@ classdef QuadBSTSampler < GenericSampler & handle
             if isempty(obj.P)
                 disp("Computing the reachability Gramian, P, of G(s)")
                 % Solve the reachability ALE of G(s)
-                %   A * P + P * A' + B * B' = 0
+                %   @math: `A * P + P * A' + B * B' = 0`
                 obj.P = lyap(obj.A, obj.B * obj.B');
             end
             P_ = obj.P;
@@ -74,7 +74,7 @@ classdef QuadBSTSampler < GenericSampler & handle
             if isempty(obj.Q)
                 disp("Computing the observability Gramian, Q, of W(s)")
                 % Solve the observability ARE of W(s)
-                %   A' * Q + Q * A + (C - B_W' * Q)'* (D * D')^{-1} * (C - B_W' * Q) = 0
+                %   @math: `A' * Q + Q * A + (C - B_W' * Q)'* (D * D')^{-1} * (C - B_W' * Q) = 0`
                 % Fit the above to MATLAB's `icare(A, B, X, R, S, E, G)', that solves:
                 %   A' * Q * E + E' * Q * A + E' * Q * G * Q * E - (E' * Q * B + S) * Rinv * (B' * Q * E + S') + X = 0
                 [obj.Q, ~, ~] = icare(obj.A, -obj.B_W, zeros(obj.n, obj.n), -(obj.D * obj.D'), obj.C', obj.I, zeros(obj.n, obj.n));
@@ -119,7 +119,7 @@ classdef QuadBSTSampler < GenericSampler & handle
         function C_lsf_ = get.C_lsf(obj)
             % Getter method for C_lsf
             % Here, output matrix of W(s)
-            %   C_lsf := C_W = D^{-1} * (C - B_W' * Q)
+            %   @math: `C_lsf := C_W = D^{-1} * (C - B_W' * Q)`
             if isempty(obj.C_lsf)
                 obj.C_lsf = obj.Dinv * (obj.C - obj.B_W' * obj.Q);
             end
@@ -135,7 +135,7 @@ classdef QuadBSTSampler < GenericSampler & handle
         function rsf_samples = samples_for_Gbar(obj, s)
             % Artificially sample the appropriate rsf to obtain samples for Gbar = C * Utilde;
             % Here, this is just G_infty(s), i.e. s.t.
-            %   G(s) * G(-s).T = W(-s).T * W(s)
+            %   @math: `G(s) * G(-s).T = W(-s).T * W(s)`
             % Gbar used in building the reduced-order Cr
             rsf_samples = obj.sampleG(s); % Call to parent class
         end
@@ -143,7 +143,7 @@ classdef QuadBSTSampler < GenericSampler & handle
         function lsf_samples = samples_for_Hbar(obj, s)
             % Artificially sample the appropriate lsf to obtain samples for Hbar = Ltilde' * B;
             % Here, this is the system cascade
-            %   F(s) := [(W(-s).T^{-1}) * G(s)]_+ = C_lsf * (s * I - A) \ B
+            %   @math: `F(s) := [(W(-s).T^{-1}) * G(s)]_+ = C_lsf * (s * I - A) \ B`
             % Hbar used in building the reduced-order Brr
 
             % Pass to sampler for Lbar, Mbar, since required samples are the same
@@ -153,7 +153,7 @@ classdef QuadBSTSampler < GenericSampler & handle
         function cascade_samples = samples_for_Lbar_Mbar(obj, s)
             % Artificially sample the appropriate system cascade to obtain samples for Lbar = Ltilde' * Utilde; Mbar = Ltilde' * A * Utilde;
             % Here, this is the system cascade
-            %   F(s) := [(W(-s).T^{-1}) * G(s)]_+ = C_lsf * (s * I - A) \ B
+            %   @math: `F(s) := [(W(-s).T^{-1}) * G(s)]_+ = C_lsf * (s * I - A) \ B`
             % Lbar used in computing approximate singular values; Mbar used in building the reduced-order Ar
 
             % Will have length(s) samples of a (p x m) rational transfer matrix; space allocation
