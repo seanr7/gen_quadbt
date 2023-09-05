@@ -102,7 +102,7 @@ classdef QuadBRBTSampler < GenericSampler & handle
             % Column dimension is J * (2 * m), since B_rsf := [B, B_N]
             Utilde = zeros(obj.n, J * (2 * m));
             for j = 1:J
-                Utilde(:, (j - 1) * m + 1 : j * m) = weightsr(j) * ((nodesr(j) * obj.I - obj.A) \ obj.B_rsf);
+                Utilde(:, (j - 1) * (2 * m) + 1 : j * (2 * m)) = weightsr(j) * ((nodesr(j) * obj.I - obj.A) \ obj.B_rsf);
             end
         end
 
@@ -113,7 +113,7 @@ classdef QuadBRBTSampler < GenericSampler & handle
             % Column dimension is K * (2 * p), since C_lsf := [C; C_M]
             Ltilde = zeros(obj.n, K * (2 * p));
             for k = 1:K
-                Ltilde(:, (k - 1) * p + 1 : k * p) = conj(weightsl(k)) * ((conj(nodesl(k)) * obj.I - obj.A') \ obj.C_lsf');
+                Ltilde(:, (k - 1) * (2 * p) + 1 : k * (2 * p)) = conj(weightsl(k)) * ((conj(nodesl(k)) * obj.I - obj.A') \ obj.C_lsf');
             end
         end
 
@@ -127,7 +127,7 @@ classdef QuadBRBTSampler < GenericSampler & handle
             % Here, C_lsf := [C; C_M], where
             %   @math: `C_M := -R_C^{-1/2} * (B' * Q + D' * C)`
             if isempty(obj.C_lsf)
-                obj.C_lsf = [C; -obj.R_Cinv_sqrt * (obj.B' * obj.Q + obj.D' * obj.C)];
+                obj.C_lsf = [obj.C; -obj.R_Cinv_sqrt * (obj.B' * obj.Q + obj.D' * obj.C)];
             end
             C_lsf_ = obj.C_lsf;
         end
@@ -137,7 +137,7 @@ classdef QuadBRBTSampler < GenericSampler & handle
             % Here, B_rsf := [B, B_N], where
             %   @math: `B_N := -(P * C' + B * D') * R_B^{-1/2}`
             if isempty(obj.B_rsf)
-                obj.B_rsf = [B, -(obj.P * obj.C' + obj.B * obj.D') * obj.R_Binv_sqrt];
+                obj.B_rsf = [obj.B, -(obj.P * obj.C' + obj.B * obj.D') * obj.R_Binv_sqrt];
             end
             B_rsf_ = obj.B_rsf;
         end
