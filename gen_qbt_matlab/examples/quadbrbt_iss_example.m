@@ -1,5 +1,6 @@
 % Make sure you have the necessary directory added to your MATLAB path
 addpath('/Users/seanr/Desktop/gen_quadbt/gen_qbt_matlab')
+addpath('/Users/seanr/Desktop/gen_quadbt/gen_qbt_matlab/benchmarks/')
 clear all
 
 %% 1. Load benchmark for testing 
@@ -12,7 +13,7 @@ eps = 1e-2;
 D = eps * eye(3, 3);
 % Need to normalize FOM s.t. it is BR
 FOM_ = ss(A, B, C, D);
-gamma = norm(FOM_, 'inf');
+gamma = norm(FOM_, 'inf');  gamma = gamma + .5;
 D = D / gamma;  C = C / sqrt(gamma);    B = B / sqrt(gamma);
 normalized_FOM_ = ss(A, B, C, D);
 disp('Sanity check; is the FOM normalized?')
@@ -135,7 +136,7 @@ opts.OrderComputation = 'Order';
 [Ar, br, cr, dr, output_opts] = ml_ct_ss_brbt(A, B, C, D, opts);
 
 br_hsvs = output_opts.Hsv;
-max_x = 200;
+max_x = 100;
 
 figure
 % Make aspect ration `golden'
