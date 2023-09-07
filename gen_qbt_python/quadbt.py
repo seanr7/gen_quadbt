@@ -564,7 +564,7 @@ class QuadBSTSampler(GenericSampleGenerator):
                 raise ValueError("D must be nonsingular")
             self.Dinv = np.linalg.solve(self.D, np.eye(self.m))
         else:  # SISO case
-            if not (self.R > 0):
+            if not (self.D > 0):
                 raise ValueError("D must be nonsingular")
             self.Dinv = 1 / self.D
 

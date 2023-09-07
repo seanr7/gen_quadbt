@@ -121,3 +121,7 @@ def abc_mimo_mass_spring_damper(n, m, k, d, ph=False):
 
     else:
         raise ValueError("System must be Port-Hamiltonian")
+
+n = 10
+A, B, C = abc_mimo_mass_spring_damper(n, 4, 4, 1)
+print(A)
