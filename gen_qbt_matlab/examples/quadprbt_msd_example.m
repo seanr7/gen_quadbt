@@ -4,7 +4,7 @@ clear all
 
 %% 1. Load benchmark for testing 
 % Set mass, spring, damping coefficients
-n = 50;
+n = 200;
 [J, F, Q, B] = ABC_MIMO_Mass_spring_damper(n, 4, 4, 1);
 % Build A B C rep.
 A = (J - F) * Q;  C = B' * Q;
@@ -130,6 +130,8 @@ opts.OrderComputation = 'Order';
 pr_hsvs = output_opts.Hsv;
 max_x = 50;
 
+%% 3b) Plot
+
 figure
 % Make aspect ration `golden'
 golden_ratio = (sqrt(5)+1)/2;
@@ -140,9 +142,10 @@ semilogy(1:max_x, hsvbar_200(1:max_x), 'x', LineWidth=1.5)
 semilogy(1:max_x, hsvbar_400(1:max_x), '+', LineWidth=1.5)
 semilogy(1:max_x, hsvbar_800(1:max_x), '*', LineWidth=1.5)
 grid on
-ylabel('$\sqrt{\lambda_k(\mathbf{P}\mathbf{Q}_{\mathcal{W}})}$', 'interpreter','latex')
-xlabel('$k$', 'interpreter','latex')
-legend('True', 'Approximate, $N = 200$', 'Approximate, $N = 400$', 'Approximate, $N = 800$', 'interpreter','latex')
+lgd = legend('True', 'Approx $(N = 200)$', 'Approx $(N = 400)$', 'Approx $(N = 800)$', 'interpreter','latex');
+fontsize(lgd,12,'points')
+set(lgd, 'FontName','Arial')
+
 
 disp('Frobenius norm error of the approximate PR HSVs; 200 nodes')
 norm(diag(hsvbar_200(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
@@ -196,6 +199,7 @@ ColMat(3,:) = [  0.9290    0.6940    0.1250];
 ColMat(4,:) = [0.4660    0.6740    0.1880];
 ColMat(5,:) = [0.4940    0.1840    0.5560];
 
+%% 4b) Plot
 
 figure
 % Make aspect ration `golden'
@@ -207,12 +211,14 @@ semilogy(2:2:2*testcases, QPRBT_200_errors,'-.g<','color',ColMat(3,:),LineWidth=
 semilogy(2:2:2*testcases, QPRBT_400_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
 semilogy(2:2:2*testcases, QPRBT_800_errors,'-.r','color',ColMat(2,:),LineWidth=1.5);
 
-legend('PGRoM PRBT', 'QPRBT, $N = 200$', 'QPRBT, $N = 400$', 'QPRBT, $N = 800$', 'interpreter','latex')
+lgd = legend('PRBT', 'QPRBT $(N = 200)$', 'QPRBT $(N = 400)$', 'QPRBT $(N = 800)$', 'interpreter','latex');
 
 % semilogy([2:2:2*testcases], BST_errors, '-s', Markersize = 10, LineWidth=1.5)
 % hold on
 % % grid on
 % semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
 % set(gca,'fontsize',12)
-xlabel('$r$, reduction order', 'interpreter','latex')
-ylabel('$\|\mathcal{G}-\mathcal{G}_r\|_{\mathcal{H}_\infty}/\|\mathcal{G}\|_{\mathcal{H}_\infty}$', 'interpreter','latex')
+xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 12)
+ylabel('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 12)
+fontsize(lgd,12,'points')
+set(lgd, 'FontName','Arial')

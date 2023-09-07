@@ -13,7 +13,7 @@ eps = 1e-2;
 D = eps * eye(3, 3);
 % Need to normalize FOM s.t. it is BR
 FOM_ = ss(A, B, C, D);
-gamma = norm(FOM_, 'inf');  gamma = gamma + .5;
+gamma = norm(FOM_, 'inf');  gamma = 2 * gamma;
 D = D / gamma;  C = C / sqrt(gamma);    B = B / sqrt(gamma);
 normalized_FOM_ = ss(A, B, C, D);
 disp('Sanity check; is the FOM normalized?')
@@ -138,6 +138,8 @@ opts.OrderComputation = 'Order';
 br_hsvs = output_opts.Hsv;
 max_x = 100;
 
+%% Plot
+
 figure
 % Make aspect ration `golden'
 golden_ratio = (sqrt(5)+1)/2;
@@ -148,15 +150,16 @@ semilogy(1:max_x, hsvbar_200(1:max_x), 'x', LineWidth=1.5)
 semilogy(1:max_x, hsvbar_400(1:max_x), '+', LineWidth=1.5)
 semilogy(1:max_x, hsvbar_800(1:max_x), '*', LineWidth=1.5)
 grid on
-ylabel('$\sqrt{\lambda_k(\mathbf{P}\mathbf{Q}_{\mathcal{W}})}$', 'interpreter','latex')
-xlabel('$k$', 'interpreter','latex')
-legend('True', 'Approximate, $N = 200$', 'Approximate, $N = 400$', 'Approximate, $N = 800$', 'interpreter','latex')
+lgd = legend('True', 'Approx $(N = 200)$', 'Approx $(N = 400)$', 'Approx $(N = 800)$', 'interpreter','latex');
+fontsize(lgd,12,'points')
+set(lgd, 'FontName','Arial')
 
-disp('Frobenius norm error of the approximate BRHSVs; 200 nodes')
+
+disp('Frobenius norm error of the approximate PR HSVs; 200 nodes')
 norm(diag(hsvbar_200(1:max_x))-diag(br_hsvs(1:max_x)), "fro")
-disp('Frobenius norm error of the approximate BRHSVs; 400 nodes')
+disp('Frobenius norm error of the approximate PR HSVs; 400 nodes')
 norm(diag(hsvbar_400(1:max_x))-diag(br_hsvs(1:max_x)), "fro")
-disp('Frobenius norm error of the approximate BRHSVs; 800 nodes')
+disp('Frobenius norm error of the approximate PR HSVs; 800 nodes')
 norm(diag(hsvbar_800(1:max_x))-diag(br_hsvs(1:max_x)), "fro")
 
 %% 4. Now, reduction error
@@ -165,7 +168,7 @@ Drbar = D; % d unchanged, always
 sysnorm = norm(FOM, 'inf');
 
 % Allocate space
-testcases = 7;
+testcases = 10;
 BRBT_errors = zeros(testcases,1);   
 QBRBT_200_errors = zeros(testcases,1);    QBRBT_400_errors = zeros(testcases,1);
 QBRBT_800_errors = zeros(testcases,1); 
@@ -194,6 +197,8 @@ end
 
 % New style (yoinked form Victor)
 
+%% Plot
+
 ColMat = zeros(5,3);
 
 %ColMat(1,:) = [1 0.6 0.4];
@@ -215,12 +220,14 @@ semilogy(2:2:2*testcases, QBRBT_200_errors,'-.g<','color',ColMat(3,:),LineWidth=
 semilogy(2:2:2*testcases, QBRBT_400_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
 semilogy(2:2:2*testcases, QBRBT_800_errors,'-.r','color',ColMat(2,:),LineWidth=1.5);
 
-legend('PGRoM BRBT', 'QBRBT, $N = 200$', 'QBRBT, $N = 400$', 'QBRBT, $N = 800$', 'interpreter','latex')
+lgd = legend('BRBT', 'QBRBT $(N = 200)$', 'QBRBT $(N = 400)$', 'QBRBT $(N = 800)$', 'interpreter','latex');
 
 % semilogy([2:2:2*testcases], BST_errors, '-s', Markersize = 10, LineWidth=1.5)
 % hold on
 % % grid on
 % semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
 % set(gca,'fontsize',12)
-xlabel('$r$, reduction order', 'interpreter','latex')
-ylabel('$\|\mathcal{G}-\mathcal{G}_r\|_{\mathcal{H}_\infty}/\|\mathcal{G}\|_{\mathcal{H}_\infty}$', 'interpreter','latex')
+xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 12)
+ylabel('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 12)
+fontsize(lgd,12,'points')
+set(lgd, 'FontName','Arial')
