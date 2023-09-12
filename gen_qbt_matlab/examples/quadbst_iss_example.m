@@ -131,11 +131,10 @@ stoch_hsvs = output_opts.Hsv;
 max_x = 100;
 
 %% Plot 3b)
-
 figure
-% Make aspect ration `golden'
 golden_ratio = (sqrt(5)+1)/2;
 axes('position', [.125 .15 .75 golden_ratio-1])
+subplot(2,1,1)
 semilogy(1:max_x, stoch_hsvs(1:max_x), 'o', LineWidth=1.5,MarkerSize=10)
 hold on
 semilogy(1:max_x, hsvbar_200(1:max_x), 'x', LineWidth=1.5)
@@ -145,14 +144,15 @@ grid on
 % ylabel('$\sqrt{\lambda_k(\mathbf{P}\mathbf{Q}_{\mathcal{W}})}$', 'interpreter','latex')
 % xlabel('$k$', 'interpreter','latex', 'fontsize',12)
 lgd = legend('True', 'Approx $(N = 200)$', 'Approx $(N = 400)$', 'Approx $(N = 800)$', 'interpreter','latex');
-fontsize(lgd,12,'points')
+fontsize(lgd,10,'points')
 set(lgd, 'FontName','Arial')
+title('Singular values', 'interpreter','latex', 'fontsize', 14)
 
 
 disp('Frobenius norm error of the approximate Stochastic HSVs; 200 nodes')
 norm(diag(hsvbar_200(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
 disp('Frobenius norm error of the approximate Stochastic HSVs; 400 nodes')
-norm(diag(hsvbar_400(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")MAT
+norm(diag(hsvbar_400(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
 disp('Frobenius norm error of the approximate Stochastic HSVs; 800 nodes')
 norm(diag(hsvbar_800(1:max_x))-diag(stoch_hsvs(1:max_x)), "fro")
 
@@ -202,11 +202,12 @@ ColMat(4,:) = [0.4660    0.6740    0.1880];
 ColMat(5,:) = [0.4940    0.1840    0.5560];
 
 %% Plot 4b)
-figure
-% Make aspect ration `golden'
-golden_ratio = (sqrt(5)+1)/2;
-axes('position', [.125 .15 .75 golden_ratio-1])
+% figure
+% % Make aspect ration `golden'
+% golden_ratio = (sqrt(5)+1)/2;
+% axes('position', [.125 .15 .75 golden_ratio-1])
 
+subplot(2,1,2)
 semilogy(2:2:2*testcases, BST_errors,'ms','color',ColMat(1,:),'markersize',15,LineWidth=1.5);hold on;
 semilogy(2:2:2*testcases, QBST_200_errors,'-.g<','color',ColMat(3,:),LineWidth=1.5);
 semilogy(2:2:2*testcases, QBST_400_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
@@ -219,7 +220,9 @@ lgd = legend('BST', 'QBST $(N = 200)$', 'QBST $(N = 400)$', 'QBST $(N = 800)$', 
 % % grid on
 % semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
 % set(gca,'fontsize',12)
-xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 12)
-ylabel('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 12)
-fontsize(lgd,12,'points')
+xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 14)
+title('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 14)
+fontsize(lgd,10,'points')
 set(lgd, 'FontName','Arial')
+
+print -depsc2 qbst_iss_ex

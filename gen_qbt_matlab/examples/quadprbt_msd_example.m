@@ -1,5 +1,6 @@
 % Make sure you have the necessary directory added to your MATLAB path
 addpath('/Users/seanr/Desktop/gen_quadbt/gen_qbt_matlab')
+addpath('/Users/seanr/Desktop/gen_quadbt/gen_qbt_matlab/benchmarks/')
 clear all
 
 %% 1. Load benchmark for testing 
@@ -132,10 +133,13 @@ max_x = 50;
 
 %% 3b) Plot
 
-figure
+% f=figure;
+% f.Position = [476 445 700 280];
 % Make aspect ration `golden'
+figure
 golden_ratio = (sqrt(5)+1)/2;
 axes('position', [.125 .15 .75 golden_ratio-1])
+subplot(2,1,1)
 semilogy(1:max_x, pr_hsvs(1:max_x), 'o', LineWidth=1.5,MarkerSize=10)
 hold on
 semilogy(1:max_x, hsvbar_200(1:max_x), 'x', LineWidth=1.5)
@@ -143,8 +147,10 @@ semilogy(1:max_x, hsvbar_400(1:max_x), '+', LineWidth=1.5)
 semilogy(1:max_x, hsvbar_800(1:max_x), '*', LineWidth=1.5)
 grid on
 lgd = legend('True', 'Approx $(N = 200)$', 'Approx $(N = 400)$', 'Approx $(N = 800)$', 'interpreter','latex');
-fontsize(lgd,12,'points')
+fontsize(lgd,10,'points')
 set(lgd, 'FontName','Arial')
+title('Singular values', 'interpreter','latex', 'fontsize', 14)
+% xlabel('$k$, index', 'interpreter','latex', 'fontsize', 14)
 
 
 disp('Frobenius norm error of the approximate PR HSVs; 200 nodes')
@@ -201,11 +207,12 @@ ColMat(5,:) = [0.4940    0.1840    0.5560];
 
 %% 4b) Plot
 
-figure
+% f=figure;
+% f.Position = [476 445 700 280];
 % Make aspect ration `golden'
-golden_ratio = (sqrt(5)+1)/2;
-axes('position', [.125 .15 .75 golden_ratio-1])
-
+% golden_ratio = (sqrt(5)+1)/2;
+% axes('position', [.125 .15 .75 golden_ratio-1])
+subplot(2,1,2)
 semilogy(2:2:2*testcases, BST_errors,'ms','color',ColMat(1,:),'markersize',15,LineWidth=1.5);hold on;
 semilogy(2:2:2*testcases, QPRBT_200_errors,'-.g<','color',ColMat(3,:),LineWidth=1.5);
 semilogy(2:2:2*testcases, QPRBT_400_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
@@ -218,7 +225,9 @@ lgd = legend('PRBT', 'QPRBT $(N = 200)$', 'QPRBT $(N = 400)$', 'QPRBT $(N = 800)
 % % grid on
 % semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
 % set(gca,'fontsize',12)
-xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 12)
-ylabel('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 12)
-fontsize(lgd,12,'points')
+xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 14)
+title('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 14)
+fontsize(lgd,10,'points')
 set(lgd, 'FontName','Arial')
+
+print -depsc2 qprbt_ex
