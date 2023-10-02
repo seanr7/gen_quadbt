@@ -1,7 +1,10 @@
 function [A,B,C,D,sys_rlc]=circuit(N)
 
 % Difficult case
-R = 0.1; Rbar = 100; Cap = 1e-12; L = 1e-11;
+% R = 0.1; Rbar = 100; Cap = 1e-12; L = 1e-11;
+
+% Moderate? 
+R = 0.1; Rbar = 100; Cap = .000001; L = .000001;
 
 % Easy case
 % R = 0.1; Rbar = 1; Cap = .1; L = .1;

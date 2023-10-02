@@ -167,7 +167,7 @@ sysnorm = norm(FOM, 'inf');
 
 % Allocate space
 testcases = 7;
-BST_errors = zeros(testcases,1);   
+PRBT_errors = zeros(testcases,1);   
 QPRBT_200_errors = zeros(testcases,1);    QPRBT_400_errors = zeros(testcases,1);
 QPRBT_800_errors = zeros(testcases,1); 
 for k = 1:testcases % orders to test
@@ -178,14 +178,14 @@ for k = 1:testcases % orders to test
     opts = ml_morlabopts('ml_ct_ss_bt');
     opts.Order = r;
     opts.OrderComputation = 'Order';
-    [Ar, Br, Cr, Dr, output_opts] = ml_ct_ss_bst(A, B, C, D, opts);
+    [Ar, Br, Cr, Dr, output_opts] = ml_ct_ss_prbt(A, B, C, D, opts);
         
-    BST_ROM = ss(Ar, Br, Cr, Dr);
+    PRBT_ROM = ss(Ar, Br, Cr, Dr);
     QPRBT_ROM_200 = ss(Arbar_200, Brbar_200, Crbar_200, Drbar);
     QPRBT_ROM_400 = ss(Arbar_400, Brbar_400, Crbar_400, Drbar);
     QPRBT_ROM_800 = ss(Arbar_800, Brbar_800, Crbar_800, Drbar);
 
-    BST_errors(k, 1) = norm(FOM-BST_ROM, 'inf')/sysnorm;
+    PRBT_errors(k, 1) = norm(FOM-PRBT_ROM, 'inf')/sysnorm;
 %     fprintf("Error in quadprbt")
 %     norm(sys-sysrbar, 'inf')
     QPRBT_200_errors(k, 1) = norm(FOM-QPRBT_ROM_200, 'inf')/sysnorm;
@@ -213,7 +213,7 @@ ColMat(5,:) = [0.4940    0.1840    0.5560];
 % golden_ratio = (sqrt(5)+1)/2;
 % axes('position', [.125 .15 .75 golden_ratio-1])
 subplot(2,1,2)
-semilogy(2:2:2*testcases, BST_errors,'ms','color',ColMat(1,:),'markersize',15,LineWidth=1.5);hold on;
+semilogy(2:2:2*testcases, PRBT_errors,'ms','color',ColMat(1,:),'markersize',15,LineWidth=1.5);hold on;
 semilogy(2:2:2*testcases, QPRBT_200_errors,'-.g<','color',ColMat(3,:),LineWidth=1.5);
 semilogy(2:2:2*testcases, QPRBT_400_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
 semilogy(2:2:2*testcases, QPRBT_800_errors,'-.r','color',ColMat(2,:),LineWidth=1.5);
@@ -225,9 +225,4 @@ lgd = legend('PRBT', 'QPRBT $(N = 200)$', 'QPRBT $(N = 400)$', 'QPRBT $(N = 800)
 % % grid on
 % semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
 % set(gca,'fontsize',12)
-xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 14)
-title('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 14)
-fontsize(lgd,10,'points')
-set(lgd, 'FontName','Arial')
-
-print -depsc2 qprbt_ex
+oh

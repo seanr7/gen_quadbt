@@ -4,14 +4,10 @@ addpath('/Users/seanr/Desktop/gen_quadbt/gen_qbt_matlab/benchmarks/')
 clear all
 
 %% 1. Load benchmark for testing 
-load('iss.mat')
-% Convert spare -> Full
-n = 270;
-A = full(A);    B = full(B);    C = full(C);
-% Include some nontrivial feedthrough
-eps = 1e-2;
-D = eps * eye(3, 3);
-% Need to normalize FOM s.t. it is BR
+% Set mass, spring, damping coefficients
+n = 1000;
+[A, B, C, D, ~]=circuit(n);
+
 FOM_ = ss(A, B, C, D);
 gamma = norm(FOM_, 'inf');  gamma = 2 * gamma;
 D = D / gamma;  C = C / sqrt(gamma);    B = B / sqrt(gamma);
@@ -19,7 +15,6 @@ normalized_FOM_ = ss(A, B, C, D);
 disp('Sanity check; is the FOM normalized?')
 norm(normalized_FOM_, 'inf')
 
-% Sampler class
 sampler = QuadBRBTSampler(A, B, C, D);
 
 %% 2. Instantiate reductor + build Loewner quadruple (Lbar, Mbar, Hbar, Gbar)
@@ -27,7 +22,7 @@ sampler = QuadBRBTSampler(A, B, C, D);
 
 % a) 200 nodes
 K = 200;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
-nodes_200 = 1i*logspace(-1, 2, N/2)'; % Halve since we will add complex conjugates
+nodes_200 = 1i*logspace(3, 9, N/2)'; % Halve since we will add complex conjugates
 % Interweave left/right points
 nodesl_200 = nodes_200(1:2:end); % For Q
 nodesr_200 = nodes_200(2:2:end); % For P
@@ -53,7 +48,7 @@ norm(Ltilde_200 * Ltilde_200' - sampler.Q, 2)/norm(sampler.Q)
 
 % b) 400 nodes
 K = 400;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
-nodes_400 = 1i*logspace(-1, 2, N/2)'; % Halve since we will add complex conjugates
+nodes_400 = 1i*logspace(3, 9, N/2)'; % Halve since we will add complex conjugates
 % Interweave left/right points
 nodesl_400 = nodes_400(1:2:end); % For Q
 nodesr_400 = nodes_400(2:2:end); % For P
@@ -91,7 +86,7 @@ norm(C * Utilde_400 - Gbar, 2)
 
 % c) 800 nodes
 K = 800;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
-nodes_800 = 1i*logspace(-1, 2, N/2)'; % Halve since we will add complex conjugates
+nodes_800 = 1i*logspace(3, 9, N/2)'; % Halve since we will add complex conjugates
 % Interweave left/right points
 nodesl_800 = nodes_800(1:2:end); % For Q
 nodesr_800 = nodes_800(2:2:end); % For P
@@ -126,9 +121,8 @@ hsvbar_800 = GQBT_Engine_800.hsvbar;
 % Compute actual square-root factors (add some noise; rounding errors make
 % these not positive definite)
 % U = chol(sampler.P + (10e-16 * eye(n, n)));    L = chol(sampler.Q + (10e-13 * eye(n, n)));
-% stoch_hsvs = sqrt(eig(sampler.P * sampler.Q));
 
-r = 270;
+r = 50;
 % 
 opts = ml_morlabopts('ml_ct_ss_bt');
 opts.Order = r;
@@ -136,32 +130,47 @@ opts.OrderComputation = 'Order';
 [Ar, br, cr, dr, output_opts] = ml_ct_ss_brbt(A, B, C, D, opts);
 
 br_hsvs = output_opts.Hsv;
-max_x = 100;
+max_x = r;
 
-%% Plot
+%% 3b) Plot
 
-figure
+% New style (yoinked form Victor)
+
+ColMat = zeros(5,3);
+
+%ColMat(1,:) = [1 0.6 0.4];
+ColMat(1,:) = [ 0.8500    0.3250    0.0980];
+ColMat(2,:) = [0.3010    0.7450    0.9330];
+ColMat(3,:) = [  0.9290    0.6940    0.1250];
+%ColMat(3,:) = [1 0.4 0.6];
+ColMat(4,:) = [0.4660    0.6740    0.1880];
+ColMat(5,:) = [0.4940    0.1840    0.5560];
+
+% f=figure;
+% f.Position = [476 445 700 280];
 % Make aspect ration `golden'
+figure
 golden_ratio = (sqrt(5)+1)/2;
 axes('position', [.125 .15 .75 golden_ratio-1])
 subplot(2,1,1)
-semilogy(1:max_x, br_hsvs(1:max_x), 'o', LineWidth=1.5,MarkerSize=10)
+semilogy(1:max_x, br_hsvs(1:max_x), 'o','color',ColMat(1,:), LineWidth=1.5,MarkerSize=10)
 hold on
-semilogy(1:max_x, hsvbar_200(1:max_x), 'x', LineWidth=1.5)
-semilogy(1:max_x, hsvbar_400(1:max_x), '+', LineWidth=1.5)
-semilogy(1:max_x, hsvbar_800(1:max_x), '*', LineWidth=1.5)
+semilogy(1:max_x, hsvbar_200(1:max_x), 'x', 'color',ColMat(3,:), LineWidth=1.5)
+semilogy(1:max_x, hsvbar_400(1:max_x), '+', 'color',ColMat(4,:), LineWidth=1.5)
+semilogy(1:max_x, hsvbar_800(1:max_x), '*', 'color',ColMat(2,:), LineWidth=1.5)
 grid on
 lgd = legend('True', 'Approx $(N = 200)$', 'Approx $(N = 400)$', 'Approx $(N = 800)$', 'interpreter','latex');
 fontsize(lgd,10,'points')
 set(lgd, 'FontName','Arial')
 title('Singular values', 'interpreter','latex', 'fontsize', 14)
+% xlabel('$k$, index', 'interpreter','latex', 'fontsize', 14)
 
 
-disp('Frobenius norm error of the approximate PR HSVs; 200 nodes')
+disp('Frobenius norm error of the approximate BR HSVs; 200 nodes')
 norm(diag(hsvbar_200(1:max_x))-diag(br_hsvs(1:max_x)), "fro")
-disp('Frobenius norm error of the approximate PR HSVs; 400 nodes')
+disp('Frobenius norm error of the approximate BR HSVs; 400 nodes')
 norm(diag(hsvbar_400(1:max_x))-diag(br_hsvs(1:max_x)), "fro")
-disp('Frobenius norm error of the approximate PR HSVs; 800 nodes')
+disp('Frobenius norm error of the approximate BR HSVs; 800 nodes')
 norm(diag(hsvbar_800(1:max_x))-diag(br_hsvs(1:max_x)), "fro")
 
 %% 4. Now, reduction error
@@ -197,23 +206,13 @@ for k = 1:testcases % orders to test
     QBRBT_800_errors(k, 1) = norm(FOM-QBRBT_ROM_800, 'inf')/sysnorm;
 end
 
-% New style (yoinked form Victor)
-
-%% Plot
-
-ColMat = zeros(5,3);
-
-%ColMat(1,:) = [1 0.6 0.4];
-ColMat(1,:) = [ 0.8500    0.3250    0.0980];
-ColMat(2,:) = [0.3010    0.7450    0.9330];
-ColMat(3,:) = [  0.9290    0.6940    0.1250];
-%ColMat(3,:) = [1 0.4 0.6];
-ColMat(4,:) = [0.4660    0.6740    0.1880];
-ColMat(5,:) = [0.4940    0.1840    0.5560];
 
 
-% figi[10^{-1},10^{-3}]\subset i\R$ure
-% % Make aspect ration `golden'
+%% 4b) Plot
+
+% f=figure;
+% f.Position = [476 445 700 280];
+% Make aspect ration `golden'
 % golden_ratio = (sqrt(5)+1)/2;
 % axes('position', [.125 .15 .75 golden_ratio-1])
 subplot(2,1,2)
@@ -229,9 +228,3 @@ lgd = legend('BRBT', 'QBRBT $(N = 200)$', 'QBRBT $(N = 400)$', 'QBRBT $(N = 800)
 % % grid on
 % semilogy([2:2:2*testcases], QBST_20_errors, '-x', Linewidth=1.5)
 % set(gca,'fontsize',12)
-xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 14)
-title('Relative $\mathcal{H}_\infty$ error', 'interpreter','latex', 'fontsize', 14)
-fontsize(lgd,10,'points')
-set(lgd, 'FontName','Arial')
-
-print -depsc2 qbrbt_iss_ex
