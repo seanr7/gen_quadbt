@@ -5,7 +5,7 @@ clear all
 
 %% 1. Load benchmark for testing 
 % Set mass, spring, damping coefficients
-n = 1000;
+n = 400;
 [A, B, C, D, ~]=circuit(n);
 
 sampler = QuadPRBTSampler(A, B, C, D);
@@ -13,109 +13,109 @@ sampler = QuadPRBTSampler(A, B, C, D);
 %% 2. Instantiate reductor + build Loewner quadruple (Lbar, Mbar, Hbar, Gbar)
 % Prepare quadrature nodes / weights 
 
-% a) 200 nodes
-K = 200;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
-nodes_200 = 1i*logspace(3, 9, N/2)'; % Halve since we will add complex conjugates
+% a) 40 nodes
+K = 40;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
+nodes_40 = 1i*logspace(-1, 4, N/2)'; % Halve since we will add complex conjugates
 % Interweave left/right points
-nodesl_200 = nodes_200(1:2:end); % For Q
-nodesr_200 = nodes_200(2:2:end); % For P
+nodesl_40 = nodes_40(1:2:end); % For Q
+nodesr_40 = nodes_40(2:2:end); % For P
 % Close left/right points under conjugation
-nodesl_200 = ([nodesl_200; conj(flipud(nodesl_200))]);     nodesr_200 = ([nodesr_200; conj(flipud(nodesr_200))]);    
+nodesl_40 = ([nodesl_40; conj(flipud(nodesl_40))]);     nodesr_40 = ([nodesr_40; conj(flipud(nodesr_40))]);    
 % Quadrature weights according to composite Trapezoidal rule
-weightsr_200 = [nodesr_200(2) - nodesr_200(1) ; nodesr_200(3:end) - nodesr_200(1:end-2) ; nodesr_200(end) - nodesr_200(end-1)] / 2;
-weightsl_200 = [nodesl_200(2) - nodesl_200(1) ; nodesl_200(3:end) - nodesl_200(1:end-2) ; nodesl_200(end) - nodesl_200(end-1)] / 2;
-weightsr_200 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsr_200));    weightsl_200 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsl_200)); 
+weightsr_40 = [nodesr_40(2) - nodesr_40(1) ; nodesr_40(3:end) - nodesr_40(1:end-2) ; nodesr_40(end) - nodesr_40(end-1)] / 2;
+weightsl_40 = [nodesl_40(2) - nodesl_40(1) ; nodesl_40(3:end) - nodesl_40(1:end-2) ; nodesl_40(end) - nodesl_40(end-1)] / 2;
+weightsr_40 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsr_40));    weightsl_40 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsl_40)); 
 
 
-GQBT_Engine_200 = GeneralizedQuadBTReductor(sampler, nodesl_200, nodesr_200, weightsl_200, weightsr_200);
+GQBT_Engine_40 = GeneralizedQuadBTReductor(sampler, nodesl_40, nodesr_40, weightsl_40, weightsr_40);
 
 % Some sanity checks
-Utilde_200 = sampler.right_sqrt_factor(nodesr_200, weightsr_200);
-Ltilde_200 = sampler.left_sqrt_factor(nodesl_200, weightsl_200);
+Utilde_40 = sampler.right_sqrt_factor(nodesr_40, weightsr_40);
+Ltilde_40 = sampler.left_sqrt_factor(nodesl_40, weightsl_40);
 
 % Check quadrature error
-disp("Implicit quadrature error in P; 200 nodes:")
-norm(Utilde_200 * Utilde_200' - sampler.P, 2)/norm(sampler.P)
-disp("Implict quadrarture error in Q; 200 nodes:")
-norm(Ltilde_200 * Ltilde_200' - sampler.Q, 2)/norm(sampler.Q)
+disp("Implicit quadrature error in P; 80 nodes:")
+norm(Utilde_40 * Utilde_40' - sampler.P, 2)/norm(sampler.P)
+disp("Implict quadrarture error in Q; 80 nodes:")
+norm(Ltilde_40 * Ltilde_40' - sampler.Q, 2)/norm(sampler.Q)
 
-% b) 400 nodes
-K = 400;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
-nodes_400 = 1i*logspace(3, 9, N/2)'; % Halve since we will add complex conjugates
+% b) 80 nodes
+K = 80;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
+nodes_80 = 1i*logspace(-1, 4, N/2)'; % Halve since we will add complex conjugates
 % Interweave left/right points
-nodesl_400 = nodes_400(1:2:end); % For Q
-nodesr_400 = nodes_400(2:2:end); % For P
+nodesl_80 = nodes_80(1:2:end); % For Q
+nodesr_80 = nodes_80(2:2:end); % For P
 % Close left/right points under conjugation
-nodesl_400 = ([nodesl_400; conj(flipud(nodesl_400))]);     nodesr_400 = ([nodesr_400; conj(flipud(nodesr_400))]);    
+nodesl_80 = ([nodesl_80; conj(flipud(nodesl_80))]);     nodesr_80 = ([nodesr_80; conj(flipud(nodesr_80))]);    
 % Quadrature weights according to composite Trapezoidal rule
-weightsr_400 = [nodesr_400(2) - nodesr_400(1) ; nodesr_400(3:end) - nodesr_400(1:end-2) ; nodesr_400(end) - nodesr_400(end-1)] / 2;
-weightsl_400 = [nodesl_400(2) - nodesl_400(1) ; nodesl_400(3:end) - nodesl_400(1:end-2) ; nodesl_400(end) - nodesl_400(end-1)] / 2;
-weightsr_400 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsr_400));    weightsl_400 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsl_400)); 
+weightsr_80 = [nodesr_80(2) - nodesr_80(1) ; nodesr_80(3:end) - nodesr_80(1:end-2) ; nodesr_80(end) - nodesr_80(end-1)] / 2;
+weightsl_80 = [nodesl_80(2) - nodesl_80(1) ; nodesl_80(3:end) - nodesl_80(1:end-2) ; nodesl_80(end) - nodesl_80(end-1)] / 2;
+weightsr_80 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsr_80));    weightsl_80 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsl_80)); 
 
 
-GQBT_Engine_400 = GeneralizedQuadBTReductor(sampler, nodesl_400, nodesr_400, weightsl_400, weightsr_400);
+GQBT_Engine_80 = GeneralizedQuadBTReductor(sampler, nodesl_80, nodesr_80, weightsl_80, weightsr_80);
 
 % Some sanity checks
-Utilde_400 = sampler.right_sqrt_factor(nodesr_400, weightsr_400);
-Ltilde_400 = sampler.left_sqrt_factor(nodesl_400, weightsl_400);
+Utilde_80 = sampler.right_sqrt_factor(nodesr_80, weightsr_80);
+Ltilde_80 = sampler.left_sqrt_factor(nodesl_80, weightsl_80);
 
 % Check quadrature error
-disp("Implicit quadrature error in P; 400 nodes:")
-norm(Utilde_400 * Utilde_400' - sampler.P, 2)/norm(sampler.P)
-disp("Implict quadrarture error in Q; 400 nodes:")
-norm(Ltilde_400 * Ltilde_400' - sampler.Q, 2)/norm(sampler.Q)
+disp("Implicit quadrature error in P; 80 nodes:")
+norm(Utilde_80 * Utilde_80' - sampler.P, 2)/norm(sampler.P)
+disp("Implict quadrarture error in Q; 80 nodes:")
+norm(Ltilde_80 * Ltilde_80' - sampler.Q, 2)/norm(sampler.Q)
 
 % Does Loewner build work?
-Lbar = GQBT_Engine_400.Lbar;    Mbar = GQBT_Engine_400.Mbar;    Hbar = GQBT_Engine_400.Hbar;    Gbar = GQBT_Engine_400.Gbar; 
+Lbar = GQBT_Engine_80.Lbar;    Mbar = GQBT_Engine_80.Mbar;    Hbar = GQBT_Engine_80.Hbar;    Gbar = GQBT_Engine_80.Gbar; 
 
 disp("Does Loewner build work? Lbar:")
-norm(Ltilde_400' * Utilde_400 - Lbar, 2)
+norm(Ltilde_80' * Utilde_80 - Lbar, 2)
 disp("Does Loewner build work? Mbar:")
-norm(Ltilde_400' * A * Utilde_400 - Mbar, 2)
+norm(Ltilde_80' * A * Utilde_80 - Mbar, 2)
 disp("Does Loewner build work? Gbar:")
-norm(Ltilde_400' * B - Hbar, 2)
+norm(Ltilde_80' * B - Hbar, 2)
 disp("Does Loewner build work? Hbar:")
-norm(C * Utilde_400 - Gbar, 2)
+norm(C * Utilde_80 - Gbar, 2)
 
-% c) 800 nodes
-K = 800;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
-nodes_800 = 1i*logspace(3, 9, N/2)'; % Halve since we will add complex conjugates
+% c) 160 nodes
+K = 160;    J = K;      N = K + J; % N / 2 is the no. of quadrature nodes for each rule
+nodes_160 = 1i*logspace(-1, 4, N/2)'; % Halve since we will add complex conjugates
 % Interweave left/right points
-nodesl_800 = nodes_800(1:2:end); % For Q
-nodesr_800 = nodes_800(2:2:end); % For P
+nodesl_160 = nodes_160(1:2:end); % For Q
+nodesr_160 = nodes_160(2:2:end); % For P
 % Close left/right points under conjugation
-nodesl_800 = ([nodesl_800; conj(flipud(nodesl_800))]);     nodesr_800 = ([nodesr_800; conj(flipud(nodesr_800))]);    
+nodesl_160 = ([nodesl_160; conj(flipud(nodesl_160))]);     nodesr_160 = ([nodesr_160; conj(flipud(nodesr_160))]);    
 % Quadrature weights according to composite Trapezoidal rule
-weightsr_800 = [nodesr_800(2) - nodesr_800(1) ; nodesr_800(3:end) - nodesr_800(1:end-2) ; nodesr_800(end) - nodesr_800(end-1)] / 2;
-weightsl_800 = [nodesl_800(2) - nodesl_800(1) ; nodesl_800(3:end) - nodesl_800(1:end-2) ; nodesl_800(end) - nodesl_800(end-1)] / 2;
-weightsr_800 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsr_800));    weightsl_800 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsl_800)); 
+weightsr_160 = [nodesr_160(2) - nodesr_160(1) ; nodesr_160(3:end) - nodesr_160(1:end-2) ; nodesr_160(end) - nodesr_160(end-1)] / 2;
+weightsl_160 = [nodesl_160(2) - nodesl_160(1) ; nodesl_160(3:end) - nodesl_160(1:end-2) ; nodesl_160(end) - nodesl_160(end-1)] / 2;
+weightsr_160 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsr_160));    weightsl_160 = sqrt(1 / (2 * pi)) * sqrt(abs(weightsl_160)); 
 
 
-GQBT_Engine_800 = GeneralizedQuadBTReductor(sampler, nodesl_800, nodesr_800, weightsl_800, weightsr_800);
+GQBT_Engine_160 = GeneralizedQuadBTReductor(sampler, nodesl_160, nodesr_160, weightsl_160, weightsr_160);
 
 % Some sanity checks
-Utilde_800 = sampler.right_sqrt_factor(nodesr_800, weightsr_800);
-Ltilde_800 = sampler.left_sqrt_factor(nodesl_800, weightsl_800);
+Utilde_160 = sampler.right_sqrt_factor(nodesr_160, weightsr_160);
+Ltilde_160 = sampler.left_sqrt_factor(nodesl_160, weightsl_160);
 
 % Check quadrature error
-disp("Implicit quadrature error in P; 800 nodes:")
-norm(Utilde_800 * Utilde_800' - sampler.P, 2)/norm(sampler.P)
-disp("Implict quadrarture error in Q; 800 nodes:")
-norm(Ltilde_800 * Ltilde_800' - sampler.Q, 2)/norm(sampler.Q)
+disp("Implicit quadrature error in P; 160 nodes:")
+norm(Utilde_160 * Utilde_160' - sampler.P, 2)/norm(sampler.P)
+disp("Implict quadrarture error in Q; 160 nodes:")
+norm(Ltilde_160 * Ltilde_160' - sampler.Q, 2)/norm(sampler.Q)
 
 
 %% 3. Let's compare the approximate hsvs against the true ones
-[~, ~, ~] = GQBT_Engine_200.svd_from_data;
-hsvbar_200 = GQBT_Engine_200.hsvbar;
-[~, ~, ~] = GQBT_Engine_400.svd_from_data;
-hsvbar_400 = GQBT_Engine_400.hsvbar;
-[~, ~, ~] = GQBT_Engine_800.svd_from_data;
-hsvbar_800 = GQBT_Engine_800.hsvbar;
+[~, ~, ~] = GQBT_Engine_40.svd_from_data;
+hsvbar_40 = GQBT_Engine_40.hsvbar;
+[~, ~, ~] = GQBT_Engine_80.svd_from_data;
+hsvbar_80 = GQBT_Engine_80.hsvbar;
+[~, ~, ~] = GQBT_Engine_160.svd_from_data;
+hsvbar_160 = GQBT_Engine_160.hsvbar;
 % Compute actual square-root factors (add some noise; rounding errors make
 % these not positive definite)
 % U = chol(sampler.P + (10e-16 * eye(n, n)));    L = chol(sampler.Q + (10e-13 * eye(n, n)));
 
-r = 50;
+r = 34;
 % 
 opts = ml_morlabopts('ml_ct_ss_bt');
 opts.Order = r;
@@ -148,23 +148,23 @@ axes('position', [.125 .15 .75 golden_ratio-1])
 subplot(2,1,1)
 semilogy(1:max_x, pr_hsvs(1:max_x), 'o','color',ColMat(1,:), LineWidth=1.5,MarkerSize=10)
 hold on
-semilogy(1:max_x, hsvbar_200(1:max_x), 'x', 'color',ColMat(3,:), LineWidth=1.5)
-semilogy(1:max_x, hsvbar_400(1:max_x), '+', 'color',ColMat(4,:), LineWidth=1.5)
-semilogy(1:max_x, hsvbar_800(1:max_x), '*', 'color',ColMat(2,:), LineWidth=1.5)
+semilogy(1:max_x, hsvbar_40(1:max_x), 'x', 'color',ColMat(3,:), LineWidth=1.5)
+semilogy(1:max_x, hsvbar_80(1:max_x), '+', 'color',ColMat(4,:), LineWidth=1.5)
+semilogy(1:max_x, hsvbar_160(1:max_x), '*', 'color',ColMat(2,:), LineWidth=1.5)
 grid on
-lgd = legend('True', 'Approx $(N = 200)$', 'Approx $(N = 400)$', 'Approx $(N = 800)$', 'interpreter','latex');
+lgd = legend('True', 'Approx $(N = 40)$', 'Approx $(N = 80)$', 'Approx $(N = 160)$', 'interpreter','latex');
 fontsize(lgd,10,'points')
 set(lgd, 'FontName','Arial')
 title('Singular values', 'interpreter','latex', 'fontsize', 14)
 % xlabel('$k$, index', 'interpreter','latex', 'fontsize', 14)
 
 
-disp('Frobenius norm error of the approximate PR HSVs; 200 nodes')
-norm(diag(hsvbar_200(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
-disp('Frobenius norm error of the approximate PR HSVs; 400 nodes')
-norm(diag(hsvbar_400(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
-disp('Frobenius norm error of the approximate PR HSVs; 800 nodes')
-norm(diag(hsvbar_800(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
+disp('Frobenius norm error of the approximate PR HSVs; 40 nodes')
+norm(diag(hsvbar_40(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
+disp('Frobenius norm error of the approximate PR HSVs; 80 nodes')
+norm(diag(hsvbar_80(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
+disp('Frobenius norm error of the approximate PR HSVs; 160 nodes')
+norm(diag(hsvbar_160(1:max_x))-diag(pr_hsvs(1:max_x)), "fro")
 
 %% 4. Now, reduction error
 FOM = ss(A, B, C, D); % FOM
@@ -174,29 +174,29 @@ sysnorm = norm(FOM, 'inf');
 % Allocate space
 testcases = 10;
 PRBT_errors = zeros(testcases,1);   
-QPRBT_200_errors = zeros(testcases,1);    QPRBT_400_errors = zeros(testcases,1);
-QPRBT_800_errors = zeros(testcases,1); 
+QPRBT_40_errors = zeros(testcases,1);    QPRBT_80_errors = zeros(testcases,1);
+QPRBT_160_errors = zeros(testcases,1); 
 for k = 1:testcases % orders to test
     r = 2*k; % reduction order
-    [Arbar_200, Brbar_200, Crbar_200] = GQBT_Engine_200.reduce(r);
-    [Arbar_400, Brbar_400, Crbar_400] = GQBT_Engine_400.reduce(r);
-    [Arbar_800, Brbar_800, Crbar_800] = GQBT_Engine_800.reduce(r);
+    [Arbar_40, Brbar_40, Crbar_40] = GQBT_Engine_40.reduce(r);
+    [Arbar_80, Brbar_80, Crbar_80] = GQBT_Engine_80.reduce(r);
+    [Arbar_160, Brbar_160, Crbar_160] = GQBT_Engine_160.reduce(r);
     opts = ml_morlabopts('ml_ct_ss_bt');
     opts.Order = r;
     opts.OrderComputation = 'Order';
     [Ar, Br, Cr, Dr, output_opts] = ml_ct_ss_prbt(A, B, C, D, opts);
         
     PRBT_ROM = ss(Ar, Br, Cr, Dr);
-    QPRBT_ROM_200 = ss(Arbar_200, Brbar_200, Crbar_200, Drbar);
-    QPRBT_ROM_400 = ss(Arbar_400, Brbar_400, Crbar_400, Drbar);
-    QPRBT_ROM_800 = ss(Arbar_800, Brbar_800, Crbar_800, Drbar);
+    QPRBT_ROM_40 = ss(Arbar_40, Brbar_40, Crbar_40, Drbar);
+    QPRBT_ROM_80 = ss(Arbar_80, Brbar_80, Crbar_80, Drbar);
+    QPRBT_ROM_160 = ss(Arbar_160, Brbar_160, Crbar_160, Drbar);
 
     PRBT_errors(k, 1) = norm(FOM-PRBT_ROM, 'inf')/sysnorm;
 %     fprintf("Error in quadprbt")
 %     norm(sys-sysrbar, 'inf')
-    QPRBT_200_errors(k, 1) = norm(FOM-QPRBT_ROM_200, 'inf')/sysnorm;
-    QPRBT_400_errors(k, 1) = norm(FOM-QPRBT_ROM_400, 'inf')/sysnorm;
-    QPRBT_800_errors(k, 1) = norm(FOM-QPRBT_ROM_800, 'inf')/sysnorm;
+    QPRBT_40_errors(k, 1) = norm(FOM-QPRBT_ROM_40, 'inf')/sysnorm;
+    QPRBT_80_errors(k, 1) = norm(FOM-QPRBT_ROM_80, 'inf')/sysnorm;
+    QPRBT_160_errors(k, 1) = norm(FOM-QPRBT_ROM_160, 'inf')/sysnorm;
 end
 
 
@@ -210,8 +210,11 @@ end
 % axes('position', [.125 .15 .75 golden_ratio-1])
 subplot(2,1,2)
 semilogy(2:2:2*testcases, PRBT_errors,'ms','color',ColMat(1,:),'markersize',15,LineWidth=1.5);hold on;
-semilogy(2:2:2*testcases, QPRBT_200_errors,'-.g<','color',ColMat(3,:),LineWidth=1.5);
-semilogy(2:2:2*testcases, QPRBT_400_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
-semilogy(2:2:2*testcases, QPRBT_800_errors,'-.r','color',ColMat(2,:),LineWidth=1.5);
+semilogy(2:2:2*testcases, QPRBT_40_errors,'-.g<','color',ColMat(3,:),LineWidth=1.5);
+semilogy(2:2:2*testcases, QPRBT_80_errors,'--mo','color', ColMat(4,:),LineWidth=1.5);
+semilogy(2:2:2*testcases, QPRBT_160_errors,'-.r','color',ColMat(2,:),LineWidth=1.5);
 
-lgd = legend('PRBT', 'QPRBT $(N = 200)$', 'QPRBT $(N = 400)$', 'QPRBT $(N = 800)$', 'interpreter','latex');
+lgd = legend('PRBT', 'QPRBT $(N = 40)$', 'QPRBT $(N = 80)$', 'QPRBT $(N = 160)$', 'interpreter','latex');
+
+xlabel('$r$, reduction order', 'interpreter','latex', 'fontsize', 14)
+title('Relative $\mathcal{H}_{\infty}$ error', 'interpreter','latex', 'fontsize', 14)
