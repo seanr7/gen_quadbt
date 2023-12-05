@@ -48,7 +48,7 @@ classdef QuadPRBTSampler < GenericSampler & handle
             if any(eig(obj.R) < 0) % IO dimensions are small, so computing this doesn't hurt
                 error('G(s) is assumed to be positve-real!')
             end
-            % Pre-compute Dinv
+            % Pre-compute Rinv
             obj.Rinv = obj.R \ eye(obj.m, obj.m);
             obj.Rinv_sqrt = chol(obj.Rinv);
         end

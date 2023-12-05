@@ -11,17 +11,17 @@ classdef GeneralizedQuadBTReductor < handle
         sampler
         %   Child of |GenericSampler| class to synthetically generate transfer function `data` relevant to the approximate balancing being performed
         nodesl
-        %   `Left` interpolation points (quadrature modes) as a (K) dim array.
+        %   `Left` interpolation points (quadrature modes) as a (K,1) dim array.
         %   Implicitly quadrature modes used in approximating the `observability` Gramian Q relevant to the underlying balancing
         %       Use `left` designation because these points are used in the approximate `left` quadrature-based square-root factor L; Q ~ L * L.T
         nodesr
-        %   `Right` interpolation point (quadrature modes) as a (J) dim array.
+        %   `Right` interpolation point (quadrature modes) as a (J,1) dim array.
         %   Implicitly quadrature modes used in approximating the `reachability` Gramian P relevant to the underlying balancing
         %       Use `right` designation because these points are used in the approximate `right` quadrature-based square-root factor U; P ~ U * U.T
         weightsl
-        %   `Left` quadrature weights as an (K) dim array.
+        %   `Left` quadrature weights as an (K,1) dim array.
         weightsr
-        %   `Right` quadrature weights as a (J) dim array.
+        %   `Right` quadrature weights as a (J,1) dim array.
         Lbar % @math: `:= Ltilde' * Utilde`
         Mbar % @math: `:= Ltilde' * A * Utilde`
         Hbar % @math: `:= Ltilde' * B`
@@ -180,7 +180,8 @@ classdef GeneralizedQuadBTReductor < handle
                 for j = 1:J % Run through columns
                     % Pre-compute denominator
                     diff = nodesl(k) - nodesr(j);
-                    Lbar_((k - 1) * p + 1 : k * p, (j - 1) * m + 1 : j * m) = -weightsl(k) * weightsr(j) * ((Gsl(:, :, k) - Gsr(:, :, j)) / diff);
+                    Lbar_((k - 1) * p + 1 : k * p, (j - 1) * m + 1 : j * m) = ...
+                        -weightsl(k) * weightsr(j) * ((Gsl(:, :, k) - Gsr(:, :, j)) / diff);
                 end
             end
         end
@@ -223,7 +224,8 @@ classdef GeneralizedQuadBTReductor < handle
                 for j = 1:J % Run through columns
                     % Pre-compute denominator
                     diff = nodesl(k) - nodesr(j);
-                    Mbar_((k - 1) * p + 1 : k * p, (j - 1) * m + 1 : j * m) = -weightsl(k) * weightsr(j) * ((nodesl(k) * Gsl(:, :, k) - nodesr(j) * Gsr(:, :, j)) / diff);
+                    Mbar_((k - 1) * p + 1 : k * p, (j - 1) * m + 1 : j * m) = ...
+                        -weightsl(k) * weightsr(j) * ((nodesl(k) * Gsl(:, :, k) - nodesr(j) * Gsr(:, :, j)) / diff);
                 end
             end
         end
