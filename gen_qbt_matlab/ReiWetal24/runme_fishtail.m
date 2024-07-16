@@ -80,16 +80,14 @@ if recomputeSamples
         fprintf(1, 'Initiating structured linear solves %d of %d.\n', k, nNodes)
         fprintf(1, '-----------------------------------------------\n');
         % Transfer function data.
-        % Gives Vright = (nodesRight(k)*Efo - Afo)\Bfo.
-        vRight           = so_structured_solve(M, D, K, B, C, nodesRight(k), 0);
-        % Gives WLeft  = ((nodesLeft(k)*Efo - Afo)')\Cfo'.
-        wLeft            = so_structured_solve(M, D, K, B, C, nodesLeft(k), 1);
+        GsLeft(:, :, k)  = C*((nodesLeft(k)^2.*M + nodesLeft(k)*D + K)\B);
+        GsRight(:, :, k) = C*((nodesRight(k)^2.*M + nodesRight(k)*D + K)\B);
+        % % Gives Vright = (nodesRight(k)*Efo - Afo)\Bfo.
+        % vRight           = so_structured_solve(M, D, K, B, C, nodesRight(k), 0);
+        % % Gives WLeft  = ((nodesLeft(k)*Efo - Afo)')\Cfo'.
+        % wLeft            = so_structured_solve(M, D, K, B, C, nodesLeft(k), 1);
         fprintf(1, 'Structured solves finished in %.2f s.\n',toc)
         fprintf(1, '-----------------------------------------------\n');
-
-        % Transfer function data.
-        GsLeft(:, :, k)              = wLeft'*Bfo;
-        GsRight(:, :, k)             = Cfo * vRight;
     end
     save('data/FishtailSamples_BandLimited.mat', 'GsLeft', 'GsRight', ...
         'nodesLeft', 'nodesRight')
