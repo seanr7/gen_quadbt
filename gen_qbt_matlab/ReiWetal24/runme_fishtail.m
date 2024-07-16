@@ -116,6 +116,10 @@ Dr_flQuadBT                                                = zeros(p, m);
 fprintf(1, 'flQuadBT REDUCED MODEL COMPUTED IN %.2f s\n', toc(timeflBT))
 fprintf(1, '-----------------------------------------\n')
 
+filename = 'results/FishtailROM_flQuadBT_Nodes400_r30';
+save(filename, 'Hsvs', 'Er_flQuadBT', 'Ar_flQuadBT', 'Br_flQuadBT', 'Cr_flQuadBT', ...
+    'Dr_flQuadBT')
+
 
 %% Frequency-limited balanced truncation (intrusive).
 % Input options.
@@ -135,11 +139,11 @@ opts.krylovopts.StoreProjection  = true;
 opts.krylovopts.krylovVopts      = struct( ...
     'NumPts'   , 500, ...
     'RealVal'  , true, ...
-    'FreqRange', [2, 8]);
+    'FreqRange', [-2, 4]);
 opts.krylovopts.krylovWopts      = opts.krylovopts.krylovVopts;
 
 % Frequency-limited options.
-opts.mormethodopts.FreqRange        = [1.0e+04, 1.0e+06];
+opts.mormethodopts.FreqRange        = [1.0e+00, 1.0e+02];
 opts.mormethodopts.OutputModel      = 'fo';
 opts.mormethodopts.OrderComputation = 'Order';
 opts.mormethodopts.Order            = 30;
@@ -161,10 +165,14 @@ Br_flBTInter = rom_flBTInter.B;
 Cr_flBTInter = rom_flBTInter.C;
 Dr_flBTInter = zeros(p, m);
 
+interHsvs = info.infoMORMETHOD.Hsvp;
+filename  = 'results/FishtailROM_flBTInter_r50';
+save(filename, 'interHsvs', 'Er_flBTInter', 'Ar_flBTInter', 'Br_flBTInter', 'Cr_flBTInter', ...
+    'Dr_flBTInter')
 
 %% Plots.
 numSamples     = 500;
-s              = 1i*logspace(2, 8, numSamples);
+s              = 1i*logspace(-2, 4, numSamples);
 flQuadBTResp   = zeros(numSamples, 1);          % Response of (non-intrusive) flQuadBT reduced model
 flQuadBTError  = zeros(numSamples, 1);          % Error due to (non-intrusive) flQuadBT reduced model
 flBTInterResp  = zeros(numSamples, 1);          % Response of (intrusive, intermediate reduction) flBT reduced model

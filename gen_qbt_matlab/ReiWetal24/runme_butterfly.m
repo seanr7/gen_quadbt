@@ -182,6 +182,9 @@ Dr_flQuadBT                                                = zeros(p, m);
 fprintf(1, 'flQuadBT REDUCED MODEL COMPUTED IN %.2f s\n', toc(timeflBT))
 fprintf(1, '-----------------------------------------\n')
 
+filename = 'results/ButterflyROM_flQuadBT_Nodes400_r30';
+save(filename, 'Hsvs', 'Er_flQuadBT', 'Ar_flQuadBT', 'Br_flQuadBT', 'Cr_flQuadBT', ...
+    'Dr_flQuadBT')
 
 %% Frequency-limited balanced truncation (intrusive).
 % Input options.
@@ -226,6 +229,11 @@ Ar_flBTInter = rom_flBTInter.A;
 Br_flBTInter = rom_flBTInter.B;
 Cr_flBTInter = rom_flBTInter.C;
 Dr_flBTInter = zeros(p, m);
+
+interHsvs = info.infoMORMETHOD.Hsvp;
+filename  = 'results/ButterflyROM_flBTInter_r30';
+save(filename, 'interHsvs', 'Er_flBTInter', 'Ar_flBTInter', 'Br_flBTInter', 'Cr_flBTInter', ...
+    'Dr_flBTInter')
 
 % 'Exact' intrusive using approximate factors of the fl Gramians.
 fprintf(1, 'COMPUTING REDUCED MODEL VIA flBT (intrusive, no intermediate reduction).\n')
@@ -321,12 +329,16 @@ V = ZContFact*Y(:, 1:r)*S(1:r, 1:r)^(-1/2); % Right
 W = ZObsvFact*U(:, 1:r)*S(1:r, 1:r)^(-1/2); % Left
 
 % Compute reduced order model via projection
-Er_flBTExact = eye(r, r); Ar_flBTExact = W'*Afo*V;    
-Br_flBTExact = W'*Bfo;    Cr_flBTExact = Cfo*V;  
+Er_flBTExact = eye(r, r);   Ar_flBTExact = W'*Afo*V;    
+Br_flBTExact = W'*Bfo;      Cr_flBTExact = Cfo*V;  
 Dr_flBTExact = zeros(p, m);
 
 fprintf(1, 'flBT REDUCED MODEL COMPUTED IN %.2f s\n', toc(timeflBT))
 fprintf(1, '------------------------------------------------\n')
+
+filename = 'results/ButterflyROM_flBTExact_r30';
+save(filename, 'Er_flBTExact', 'Ar_flBTExact', 'Br_flBTExact', 'Cr_flBTExact', ...
+    'Dr_flBTExact', 'ZObsvFact', 'ZContFact')
 
 %% Plots.
 numSamples     = 500;
