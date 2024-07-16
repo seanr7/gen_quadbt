@@ -61,8 +61,8 @@ a = 4;  b = 6;  nNodes = 400;
     nNodes, true);
 
 % Transfer function data.
-% recomputeSamples = true;
-recomputeSamples = false;
+recomputeSamples = true;
+% recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -116,8 +116,8 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-% checkLoewner = true;
-checkLoewner = false;
+checkLoewner = true;
+% checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct.\n')
     fprintf(1, '-----------------------------------------------------------------------\n')
@@ -267,7 +267,7 @@ solve_opts = struct( ...
     'FctUpdate' , 1, ...
     'Freqs'     , [1.0e+04, 1.0e+06], ...
     'Info'      , 2, ...
-    'MaxIter'   , 200, ...
+    'MaxIter'   , 150, ...
     'MinIter'   , 10, ...
     'ModGramian', 0, ...
     'Npts'      , 1601, ...
@@ -360,8 +360,7 @@ else
     load('data/ButterflyFullOrderSimData.mat')
 end
 
-
-% Plot frequency response along imaginary axis.
+% Compute frequency response along imaginary axis.
 for ii=1:numSamples
     fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, s(ii))
     % Evaluate transfer function magnitude
@@ -372,51 +371,66 @@ for ii=1:numSamples
     Gr_flBTExact       = Cr_flBTExact*((s(ii)*Er_flBTExact - Ar_flBTExact)\Br_flBTExact) ...
         + Dr_flBTExact;
     flQuadBTResp(ii)   = norm(Gr_flQuadBT, 2); 
-    flQuadBTError(ii)  = norm(Gfo(:, :, ii) - Gr_flQuadBT, 2); 
+    flQuadBTError(ii)  = norm(Gfo(:, :, ii) - Gr_flQuadBT, 2)/GfoResp(ii); 
     flBTInterResp(ii)  = norm(Gr_flBTInter, 2); 
-    flBTInterError(ii) = norm(Gfo(:, :, ii) - Gr_flBTInter, 2); 
+    flBTInterError(ii) = norm(Gfo(:, :, ii) - Gr_flBTInter, 2)/GfoResp(ii); 
     flBTExactResp(ii)  = norm(Gr_flBTExact, 2); 
-    flBTExactError(ii) = norm(Gfo(:, :, ii) - Gr_flBTExact, 2); 
+    flBTExactError(ii) = norm(Gfo(:, :, ii) - Gr_flBTExact, 2)/GfoResp(ii); 
     fprintf(1, '----------------------------------------------------------------------\n');
 end
 
-% Plot colors
-ColMat = zeros(6,3);
-ColMat(1,:) = [0.8500    0.3250    0.0980];
-ColMat(2,:) = [0.3010    0.7450    0.9330];
-ColMat(3,:) = [0.9290    0.6940    0.1250];
-ColMat(4,:) = [0.4660    0.6740    0.1880];
-ColMat(5,:) = [0.4940    0.1840    0.5560];
-ColMat(6,:) = [1 0.4 0.6];
 
-figure(1)
-fs = 12;
-% Magnitudes
-set(gca, 'fontsize', 10)
-subplot(2,1,1)
-loglog(imag(s), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
-loglog(imag(s), flQuadBTResp,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
-loglog(imag(s), flBTInterResp, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
-loglog(imag(s), flBTExactResp, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
-leg = legend('Full-order', 'flQuadBT', 'flBTInter', 'flBTExact', 'location', 'southeast', 'orientation', 'horizontal', ...
-    'interpreter', 'latex');
-xlim([imag(s(1)), imag(s(end))])
-set(leg, 'fontsize', 10, 'interpreter', 'latex')
-xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
-ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
+plotResponse = false;
+if plotResponse
+    % Plot colors
+    ColMat      = zeros(6,3);
+    ColMat(1,:) = [0.8500    0.3250    0.0980];
+    ColMat(2,:) = [0.3010    0.7450    0.9330];
+    ColMat(3,:) = [0.9290    0.6940    0.1250];
+    ColMat(4,:) = [0.4660    0.6740    0.1880];
+    ColMat(5,:) = [0.4940    0.1840    0.5560];
+    ColMat(6,:) = [1 0.4 0.6];
+    
+    figure(1)
+    fs = 12;
+    % Magnitudes
+    set(gca, 'fontsize', 10)
+    subplot(2,1,1)
+    loglog(imag(s), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
+    loglog(imag(s), flQuadBTResp,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
+    loglog(imag(s), flBTInterResp, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
+    loglog(imag(s), flBTExactResp, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
+    leg = legend('Full-order', 'flQuadBT', 'flBTInter', 'flBTExact', 'location', 'southeast', 'orientation', 'horizontal', ...
+        'interpreter', 'latex');
+    xlim([imag(s(1)), imag(s(end))])
+    set(leg, 'fontsize', 10, 'interpreter', 'latex')
+    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
+    
+    % Relative errors
+    subplot(2,1,2)
+    loglog(imag(s), flQuadBTError./GfoResp,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    loglog(imag(s), flBTInterError./GfoResp, '-*', 'linewidth', 2, 'color', ColMat(3,:));
+    loglog(imag(s), flBTExactError./GfoResp, '-*', 'linewidth', 2, 'color', ColMat(4,:));
+    leg = legend('flQuadBT', 'flBTInter', 'flBTExact', 'location', 'southeast', 'orientation', 'horizontal', ...
+        'interpreter', 'latex');
+    xlim([imag(s(1)), imag(s(end))])
+    set(leg, 'fontsize', 10, 'interpreter', 'latex')
+    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
+        fs, 'interpreter', 'latex')
+end
 
-% Relative errors
-subplot(2,1,2)
-loglog(imag(s), flQuadBTError./GfoResp,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
-loglog(imag(s), flBTInterError./GfoResp, '-*', 'linewidth', 2, 'color', ColMat(3,:));
-loglog(imag(s), flBTExactError./GfoResp, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-leg = legend('flQuadBT', 'flBTInter', 'flBTExact', 'location', 'southeast', 'orientation', 'horizontal', ...
-    'interpreter', 'latex');
-xlim([imag(s(1)), imag(s(end))])
-set(leg, 'fontsize', 10, 'interpreter', 'latex')
-xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
-ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
-    fs, 'interpreter', 'latex')
+write = 1;
+if write
+    % Store data
+    resposnseMatrix = [imag(s)', GfoResp, flQuadBTResp, flBTInterResp, flBTExactResp];
+    dlmwrite('results/r30Response.dat', resposnseMatrix, ...
+        'delimiter', '\t', 'precision', 8);
+    errorMatrix = [imag(s)', flQuadBTError, flBTInterError, flBTExactError];
+    dlmwrite('results/r30Error.dat', errorMatrix, ...
+        'delimiter', '\t', 'precision', 8);
+end
 
 
 %% Modified Gramians.
