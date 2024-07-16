@@ -1,9 +1,8 @@
-%% RUNME_BUTTERFLY
-% Script file to run all experiments involving the Butterfly Gyroscope
-% model.
+%% RUNME_FISHTAIL
+% Script file to run all experiments in ...
 
 %
-% This file is part of the archive Code, Data, and Results for Numerical 
+% This file is part of the archive Code and Results for Numerical 
 % Experiments in "..."
 % Copyright (c) 2024 Sean Reiter, Steffen W. R. Werner, and ...
 % All rights reserved.
@@ -40,21 +39,14 @@ fprintf(1, '\n');
 
 
 %% Load data.
-fprintf(1, 'Loading butterfly gyroscope benchmark problem.\n')
-fprintf(1, '----------------------------------------------\n')
-
-% From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Butterfly_Gyroscope
-% Rayleigh Damping: D = alpha*M + beta*K
-%   alpha = 0;
-%   beta  = 1e-6;
-load('data/Butterfly.mat')
-
+% From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Artificial_Fishtail
+load('data/Fishtail.mat')
 
 %% Frequency-limited balanced truncation from data.
 
-% Test performance from i[1e2, 1e8]; limited frequency band of interest
-% i[1e4, 1e6].
-a = 4;  b = 6;  nNodes = 400;          
+% Test performance from i[1e-2, 1e4]; limited frequency band of interest
+% i[1e0, 1e2].
+a = 0;  b = 2;  nNodes = 400;          
 
 % Prepare quadrature weights and nodes according to Trapezoidal rule.
 [nodesLeft, weightsLeft, nodesRight, weightsRight] = trapezoidal_rule([a, b], ...
@@ -75,8 +67,6 @@ if recomputeSamples
     sLength = length(nNodes);
     GsLeft  = zeros(p, m, nNodes);
     GsRight = zeros(p, m, nNodes);
-    WLeft   = zeros(2*n, nNodes*p);
-    VRight  = zeros(2*n, nNodes*m);
     % Since we need the first-order solves for verifying that the Loewner
     % matrices are built correctly, we compute the data using the
     % first-order realization (as opposed to second-order).
@@ -96,15 +86,13 @@ if recomputeSamples
         % Transfer function data.
         GsLeft(:, :, k)              = wLeft'*Bfo;
         GsRight(:, :, k)             = Cfo * vRight;
-        WLeft(:, (k - 1)*p + 1:k*p)  = wLeft;
-        VRight(:, (k - 1)*m + 1:k*m) = vRight;
     end
-    save('data/ButterflySamples_BandLimited.mat', 'GsLeft', 'GsRight', ...
-        'nodesLeft', 'nodesRight', 'WLeft', 'VRight', '-v7.3')
+    save('data/FishtailSamples_BandLimited.mat', 'GsLeft', 'GsRight', ...
+        'nodesLeft', 'nodesRight')
 else
     fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
     fprintf(1, '-------------------------------------------\n')
-    load('data/ButterflySamples_BandLimited.mat', 'GsLeft', 'GsRight')
+    load('data/FishtailSamples_BandLimited.mat', 'GsLeft', 'GsRight')
 end
 
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE.\n')
@@ -116,65 +104,11 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-checkLoewner = true;
-% checkLoewner = false;
-if checkLoewner
-    fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct.\n')
-    fprintf(1, '-----------------------------------------------------------------------\n')
-    % Load pre-computed linear solves.
-    load('data/ButterflySamples_BandLimited', 'WLeft', 'VRight')
-
-    % Quadrature-based square root factors.
-    timeFactors     = tic;
-    leftObsvFactor  = zeros(2*n, nNodes*p);
-    rightContFactor = zeros(2*n, nNodes*m);
-    fprintf(1, 'COMPUTING APPROXIMATE SQUARE-ROOT FACTORS.\n')
-    fprintf(1, '------------------------------------------\n')
-    for k = 1:nNodes
-        rightContFactor(:, (k - 1)*m + 1:k*m) = weightsRight(k)*VRight(:, (k - 1)*m + 1:k*m);
-        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = conj(weightsLeft(k))*WLeft(:, (k - 1)*p + 1:k*p);
-    end
-    fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeLoewner))
-    fprintf(1, '------------------------------------------\n')
-
-    % Build first-order system realization for check.
-    % Descriptor matrix.
-    Efo                       = spalloc(2*n, 2*n, nnz(M) + n); % Descriptor matrix; Efo = [I, 0: 0, M]
-    Efo(1:n, 1:n)             = speye(n);                      % (1, 1) block
-    Efo(n + 1:2*n, n + 1:2*n) = M;                             % (2, 2) block is (sparse) mass matrix
-    % State matrix.
-    Afo                       = spalloc(2*n, 2*n, nnz(K) + nnz(D) + n); % Afo = [0, I; -Kso, -Dso]
-    Afo(1:n, n + 1:2*n)       = speye(n);                               % (1, 2) block of Afo
-    Afo(n + 1:2*n, 1:n)       = -K;                                     % (2, 1) block is -K
-    Afo(n + 1:2*n, n + 1:2*n) = -D;                                     % (2, 2) block is -D
-    % Input matrix.
-    Bfo               = spalloc(2*n, m, nnz(B)); % Bfo = [0; B];
-    Bfo(n + 1:2*n, :) = B; 
-    % Output matrix. Position input, only
-    Cfo         = spalloc(p, 2*n, nnz(C)); % Cfo = [C, 0];
-    Cfo(:, 1:n) = C; 
-
-    fprintf('-----------------------------------------------------------------------------------\n')
-    fprintf('Check for Lbar: Error || Lbar - leftObsvFactor.H * Efo * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * Efo * rightContFactor - Lbar, 2))
-    fprintf('Check for Mbar: Error || Mbar - leftObsvFactor.H * Afo * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * Afo * rightContFactor - Mbar, 2))
-    fprintf('Check for Hbar: Error || Hbar - leftObsvFactor.H * Bfo                   ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * Bfo - Hbar, 2))
-    fprintf('Check for Gbar: Error || Gbar - Cfo * rightContFactor                    ||_2: %.16f\n', ...
-        norm(Cfo * rightContFactor - Gbar, 2))
-    fprintf('-----------------------------------------------------------------------------------\n')
-else
-    fprintf(1, 'Not verifying Loewner build; moving on.\n')
-    fprintf(1, '---------------------------------------\n')
-end
-
-
 fprintf(1, 'COMPUTING REDUCED MODEL VIA flQuadBT (non-intrusive).\n')
 fprintf(1, '-----------------------------------------------------\n')
 timeflBT = tic;
 % Specify order of reduction.
-r = 30; 
+r = 50; 
 % Reduction step. 
 [Hsvs, Er_flQuadBT, Ar_flQuadBT, Br_flQuadBT, Cr_flQuadBT] = quadbt_reductor(Lbar, ...
     Mbar, Hbar, Gbar, r);
@@ -227,106 +161,6 @@ Br_flBTInter = rom_flBTInter.B;
 Cr_flBTInter = rom_flBTInter.C;
 Dr_flBTInter = zeros(p, m);
 
-% 'Exact' intrusive using approximate factors of the fl Gramians.
-fprintf(1, 'COMPUTING REDUCED MODEL VIA flBT (intrusive, no intermediate reduction).\n')
-fprintf(1, '------------------------------------------------------------------------\n')
-timeflBT = tic;
-
-% For stability of solver; use strictly dissipative companion form
-% Compute realization alpha.
-mfun  = @(x) (M * x + 0.25 * (D * (K \ (D * x))));
-alpha = 1 / (2 * eigs(mfun, n, D, 1, 'LR', struct('disp', 0)));
-
-% Get strictly dissipative realization.
-% Efo = [K, alpha * M; alpha * M, M];
-Efo                   = spalloc(2*n, 2*n, nnz(K) + nnz(M));
-Efo(1:n, 1:n)         = K;
-Efo(1:n, n+1:2*n)     = alpha*M;      
-Efo(n+1:2*n, 1:n)     = alpha*M;      
-Efo(n+1:2*n, n+1:2*n) = M;      
-
-% Afo = [-alpha * K, K - alpha * D; -K, -D + alpha * M];
-Afo                   = spalloc(2*n, 2*n, nnz(K) + nnz(K - alpha*D) + nnz(K) + nnz(-D + alpha*M));
-Afo(1:n, 1:n)         = -alpha*K;
-Afo(1:n, n+1:2*n)     = K - alpha*D;      
-Afo(n+1:2*n, 1:n)     = -K;      
-Afo(n+1:2*n, n+1:2*n) = -D + alpha*M;     
-
-% Note; Bfo and Cfo must be dense for matrix eqn solver!
-% Bfo = [alpha * B; B];
-Bfo             = zeros(2*n, m);
-Bfo(1:n, :)     = alpha*B; 
-Bfo(n+1:2*n, :) = B; 
-
-% Cfo = [C, zeros(size(C))];
-Cfo         = zeros(p, 2*n);
-Cfo(:, 1:n) = C;
-
-% Solver options.
-solve_opts = struct( ...
-    'FctUpdate' , 1, ...
-    'Freqs'     , [1.0e+04, 1.0e+06], ...
-    'Info'      , 2, ...
-    'MaxIter'   , 150, ...
-    'MinIter'   , 10, ...
-    'ModGramian', 0, ...
-    'Npts'      , 1601, ...
-    'Shifts'    , 'imaginary', ...
-    'Solver'    , 'logm', ...
-    'SolverFreq', 1, ...
-    'StoreFacE' , 0, ...
-    'StoreV'    , 0, ...
-    'TolComp'   , eps, ...
-    'TolLyap'   , 1.0e-10, ...
-    'TolRHS'    , 1.0e-12, ...
-    'TrueRes'   , 1, ...
-    'L'         , [], ...
-    'pL'        , []);
-
-timePstart = tic;
-fprintf(1, 'SOLVING FOR FREQUENCY-LIMITED CONTROLLABILITY GRAMIAN.\n')
-fprintf(1, '------------------------------------------------------\n')
-[ZCont, YCont, infoCont] = freq_lyap_rksm(Afo, Bfo, Efo, solve_opts);
-fprintf(1, 'COMPUTED IN %.2f s\n', toc(timePstart))
-[XCont, LCont] = eig(YCont);
-
-timeQstart = tic;
-fprintf(1, 'SOLVING FOR FREQUENCY-LIMITED OBSERVABILITY GRAMIAN.\n')
-fprintf(1, '----------------------------------------------------\n')
-[ZObsv, YObsv, infoObsv] = freq_lyap_rksm(Afo', Cfo', Efo', solve_opts);
-fprintf(1, 'COMPUTED IN %.2f s\n', toc(timeQstart))
-[XObsv, LObsv] = eig(YObsv);
-
-% Gramian is Pfl = Zcont*Ycont*Zcont'. Too large to form as dense matrix.
-% Instead:
-%  1. Factor [X, L] = eig(YCont);
-%  2. Based on truncation, keep leading eigenvalues
-%  3. Take ZContFact = Z*X(1:t)*sqrt(L(1:t));
-% And similarly for ZObsvFact
-[LCont, p1]    = sort(diag(LCont), 'descend');
-tol            = 10e-14;
-t1             = find(LCont>tol, 1,'last'); % Truncation order
-[LObsv, p2]    = sort(diag(LObsv), 'descend');
-tol            = 10e-14;
-t2             = find(LObsv>tol, 1,'last'); % Truncation order
-ZContFact      = ZCont*XCont(:, p1(1:t1))*diag(sqrt(LCont(1:t1)));
-ZObsvFact      = ZObsv*XObsv(:, p2(1:t2))*diag(sqrt(LObsv(1:t2)));
-
-% Formulate projection matrices
-[U, S, Y] = svd(ZObsvFact'*Efo*ZContFact);
-
-r = min([r, t1, t2]);
-% Compute projection matrices
-V = ZContFact*Y(:, 1:r)*S(1:r, 1:r)^(-1/2); % Right
-W = ZObsvFact*U(:, 1:r)*S(1:r, 1:r)^(-1/2); % Left
-
-% Compute reduced order model via projection
-Er_flBTExact = eye(r, r); Ar_flBTExact = W'*Afo*V;    
-Br_flBTExact = W'*Bfo;    Cr_flBTExact = Cfo*V;  
-Dr_flBTExact = zeros(p, m);
-
-fprintf(1, 'flBT REDUCED MODEL COMPUTED IN %.2f s\n', toc(timeflBT))
-fprintf(1, '------------------------------------------------\n')
 
 %% Plots.
 numSamples     = 500;
@@ -335,8 +169,6 @@ flQuadBTResp   = zeros(numSamples, 1);          % Response of (non-intrusive) fl
 flQuadBTError  = zeros(numSamples, 1);          % Error due to (non-intrusive) flQuadBT reduced model
 flBTInterResp  = zeros(numSamples, 1);          % Response of (intrusive, intermediate reduction) flBT reduced model
 flBTInterError = zeros(numSamples, 1);          % Error due to (intrusive, intermediate reduction) flBT reduced model
-flBTExactResp  = zeros(numSamples, 1);          % Response of (intrusive, intermediate reduction) flBT reduced model
-flBTExactError = zeros(numSamples, 1);          % Error due to (intrusive, intermediate reduction) flBT reduced model
 
 % Full-order simulation data.
 % recompute = false;
@@ -353,11 +185,11 @@ if recompute
         GfoResp(ii)   = norm(Gfo(:, :, ii), 2);
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
-    save('data/ButterflyFullOrderSimData.mat', 'Gfo', 'GfoResp')
+    save('data/FishtailFullOrderSimData.mat', 'Gfo', 'GfoResp')
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
-    load('data/ButterflyFullOrderSimData.mat')
+    load('data/FishtailFullOrderSimData.mat')
 end
 
 % Compute frequency response along imaginary axis.
@@ -368,14 +200,10 @@ for ii=1:numSamples
         + Dr_flQuadBT;
     Gr_flBTInter       = Cr_flBTInter*((s(ii)*Er_flBTInter - Ar_flBTInter)\Br_flBTInter) ...
         + Dr_flBTInter;
-    Gr_flBTExact       = Cr_flBTExact*((s(ii)*Er_flBTExact - Ar_flBTExact)\Br_flBTExact) ...
-        + Dr_flBTExact;
     flQuadBTResp(ii)   = norm(Gr_flQuadBT, 2); 
     flQuadBTError(ii)  = norm(Gfo(:, :, ii) - Gr_flQuadBT, 2)/GfoResp(ii); 
     flBTInterResp(ii)  = norm(Gr_flBTInter, 2); 
     flBTInterError(ii) = norm(Gfo(:, :, ii) - Gr_flBTInter, 2)/GfoResp(ii); 
-    flBTExactResp(ii)  = norm(Gr_flBTExact, 2); 
-    flBTExactError(ii) = norm(Gfo(:, :, ii) - Gr_flBTExact, 2)/GfoResp(ii); 
     fprintf(1, '----------------------------------------------------------------------\n');
 end
 
@@ -399,8 +227,7 @@ if plotResponse
     loglog(imag(s), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
     loglog(imag(s), flQuadBTResp,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
     loglog(imag(s), flBTInterResp, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
-    loglog(imag(s), flBTExactResp, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
-    leg = legend('Full-order', 'flQuadBT', 'flBTInter', 'flBTExact', 'location', 'southeast', 'orientation', 'horizontal', ...
+    leg = legend('Full-order', 'flQuadBT', 'flBTInter', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
@@ -411,8 +238,7 @@ if plotResponse
     subplot(2,1,2)
     loglog(imag(s), flQuadBTError./GfoResp,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
     loglog(imag(s), flBTInterError./GfoResp, '-*', 'linewidth', 2, 'color', ColMat(3,:));
-    loglog(imag(s), flBTExactError./GfoResp, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-    leg = legend('flQuadBT', 'flBTInter', 'flBTExact', 'location', 'southeast', 'orientation', 'horizontal', ...
+    leg = legend('flQuadBT', 'flBTInter', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
@@ -425,16 +251,24 @@ write = 1;
 if write
     % Store data
     resposnseMatrix = [imag(s)', GfoResp, flQuadBTResp, flBTInterResp, flBTExactResp];
-    dlmwrite('results/r30ButterflyResponse.dat', resposnseMatrix, ...
+    dlmwrite('results/r50FishtailResponse.dat', resposnseMatrix, ...
         'delimiter', '\t', 'precision', 8);
     errorMatrix = [imag(s)', flQuadBTError, flBTInterError, flBTExactError];
-    dlmwrite('results/r30ButterflyError.dat', errorMatrix, ...
+    dlmwrite('results/r50FishtailError.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
 
 
 %% Modified Gramians.
  
+
+
+%% Finished script.
+fprintf(1, 'FINISHED SCRIPT.\n');
+fprintf(1, '================\n');
+fprintf(1, '\n');
+
+diary off
 
 
 %% Finished script.
