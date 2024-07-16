@@ -88,8 +88,8 @@ Hbar = flQuadBT_Engine.Hbar;    Gbar = flQuadBT_Engine.Gbar;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(Loewner_start))
 fprintf(1, '------------------------------------------------------\n')
 
-check_Loewner = 1;
-if check_Loewner
+checkLoewner = true;
+if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct.\n')
     fprintf(1, '-----------------------------------------------------------------------\n')
 

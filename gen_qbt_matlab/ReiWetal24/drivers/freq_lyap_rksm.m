@@ -916,7 +916,14 @@ while niter <= opts.MaxIter
                     roff = beta * yt(m+1:end, :)';
                     rhs2 = [yt(1:m, 1:m) * beta' + beta * yt(1:m, 1:m)',...
                         roff; roff', zeros(proj_end-m, proj_end-m)];
-                    nBf  = norm(rhs2, 2);
+                    nBf  = norm(rhs2, 2); % ORIGINAL CODE 
+                    % Try and catch implemented due to error (SR,
+                    % 6-26-2024)
+                    % try
+                    %     nBf  = norm(rhs2, 2); % ORIGINAL CODE 
+                    % catch
+                    %     nBf  = normest(rhs2, 2);
+                    % end
                 end
                 
                 % Solve the projected Lyapunov equation.

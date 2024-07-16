@@ -58,6 +58,138 @@ else
     load('data/MSD.mat')
 end
 
+
+%% Compute intermediate reduced model.
+% Project down full-order model to intermediate reduced model for the
+% purpose of computing frequency-limited Gramians.
+
+% Option to recompute or load intermediate reduced model.
+% recompute = false;
+recompute = true;
+if recompute
+    % Project down using r < noInterpPoints interpolation points along iR
+    noInterpPoints = 500;                                % Number of frequencies to sample at
+    interpPoints   = 1i*logspace(0, 6, noInterpPoints); % Interpolation points
+
+    % Compute Galerkin model reduction basis
+    linear_solves = tic;
+    fprintf(1, 'Computing Galerkin model reduction basis and intermediate reduced model.\n')
+    fprintf(1, '------------------------------------------------------------------------\n')
+    % Space allocation for basis and transfer function values
+    V       = zeros(n, m*noInterpPoints);
+    Gfo     = zeros(p, m, noInterpPoints);
+    res_fom = zeros(noInterpPoints, 1);
+    for k = 1:noInterpPoints
+        this_solve = tic;
+        fprintf(1, 'CURRENT ITERATE IS k = %d\n', k)
+        fprintf(1, '---------------------------\n')
+        V(:, k) = (interpPoints(k)^2.*M + interpPoints(k).*D + K)\B;
+        fprintf(1, 'k = %d SOLVE FINISHED IN %.2f s\n', k, toc(this_solve))
+        fprintf(1, '--------------------------------\n')
+
+        % While we're at it, evaluate transfer function
+        Gfo(:, :, k) = C*V(:, k); 
+        res_fom(k)   = norm(Gfo(:, :, k), 2);
+    end
+    fprintf(1, 'GALERKIN BASIS COMPUTED IN %.2f s\n', toc(linear_solves))
+    fprintf(1, '-----------------------------------\n')
+
+    % Orthogonalize model reduction basis to avoid ill-conditioning
+    orth = tic;
+    fprintf(1, 'ORTHOGONALIZING PROJECTION MATRIX.\n')
+    fprintf(1, '----------------------------------\n')
+    VExpanded     = [real(V), imag(V)];              % To ensure intermediate model is real-valued
+    tol           = 10e-14;                          % Singular value cutoff
+    [U, Sigma, ~] = svd(VExpanded);
+    r             = find(diag(Sigma)>tol, 1,'last'); % Finds index of last singular value > tol
+    Vorth         = U(:, 1:r);  
+    fprintf(1, 'PROJECTION MATRIX MATRIX ORTHOGONALIZED IN %.2f s\n', toc(orth))
+    fprintf(1, '---------------------------------------------------\n')
+
+    % Project down full-order matrices
+    proj = tic;
+    fprintf(1, 'COMPUTING INTERMEDIATE REDUCED MODEL VIA GALERKIN PROJECTION.\n')
+    fprintf(1, '-------------------------------------------------------------\n')
+    Mr = Vorth.'*M*Vorth;   Dr = Vorth.'*D*Vorth;   Kr = Vorth.'*K*Vorth;   
+    Br = Vorth.'*B;         Cr = C*Vorth;
+
+    % Now, convert to first-order realization (fl Gramian solver
+    % implemented for first-order systems)
+    Er_fo_int                   = zeros(2*r, 2*r); % Descriptor matrix; Efo = [I, 0: 0, M]
+    Er_fo_int(1:r, 1:r)         = eye(r, r);       % (1, 1) block
+    Er_fo_int(r+1:2*r, r+1:2*r) = Mr;              % (2, 2) block is  mass matrix
+
+    Ar_fo_int                   = zeros(2*r, 2*r); % Afo = [0, I; -K, -D]
+    Ar_fo_int(1:r, r+1:2*r)     = eye(r, r);       % (1, 2) block of Afo
+    Ar_fo_int(r+1:2*r, 1:r)     = -Kr;             % (2, 1) block is -K
+    Ar_fo_int(r+1:2*r, r+1:2*r) = -Dr;             % (2, 2) block is -D
+
+    Br_fo_int             = zeros(2*r, m); % Bfo = [0; B];
+    Br_fo_int(r+1:2*r, :) = Br; 
+
+    % Position input, only
+    Cr_fo_int         = zeros(p, 2*r); % Cfo = [C, 0];
+    Cr_fo_int(:, 1:r) = Cr; 
+
+    % Save Gakerkin model reduction basis
+    % save('data/ButterflyFOIntermedROM.mat', 'Vorth', 'Er_fo_int', 'Ar_fo_int', ...
+    %     'Br_fo_int', 'Cr_fo_int')
+
+    % Save full order simulation data
+    % save('data/ButterflyFOSimulation.mat', 'Gfo', 'res_fom', 'interpPoints')
+else
+    fprintf(1, 'Not recomputing; load intermediate reduced model.\n')
+    fprintf(1, '--------------------------------------------------\n')
+    % Load intermediate reduced model 
+    noInterpPoints = 500; 
+    load('data/ButterflyFOIntermedROM.mat', 'Er_fo_int', 'Ar_fo_int', 'Br_fo_int', ...
+        'Cr_fo_int')
+    % Load full-order simulation data for later comparison
+    load('data/ButterflyFOSimulation.mat', 'Gfo', 'res_fom', 'interpPoints')
+end
+
+% Validate intermediate reduced model.
+% validate = false;
+validate = true;
+if validate
+    % Load full-order simulation data
+    % load('data/ButterflyFOSimulation.mat', 'Gfo', 'res_fom', 'interpPoints')
+    % Simulate intermediate reduced model.
+    Gro     = zeros(p, m, noInterpPoints);
+    res_rom = zeros(noInterpPoints, 1);
+    for k = 1:noInterpPoints
+        fprintf(1, 'Frequency step %d, f=%.2f Hz ...\n ',k, imag(interpPoints(k))/(2*pi))
+        Gro(:, :, k) = Cr_fo_int*((interpPoints(k).*Er_fo_int - Ar_fo_int)\Br_fo_int);
+        res_rom(k)   = norm(Gro(:, :, k), 2);
+        % Error at kth frequency
+        fprintf(1, 'Relative error at frequency step %d, f=%.2f Hz: %.12f\n ',k, imag(interpPoints(k))/(2*pi), ...
+            norm(Gfo(:, :, k) - Gro(:, :, k))/abs(res_fom(k)))
+        fprintf(1, '---------------------------------------s-----------------------------\n')
+    end
+    % Plot colors
+    ColMat = zeros(2,3);
+    ColMat(1,:) = [0.8500    0.3250    0.0980];
+    ColMat(2,:) = [0.3010    0.7450    0.9330];
+    
+    figure(1)
+    % Pointwise L_infty error
+    subplot(2,1,1)
+    loglog(imag(interpPoints), abs(res_fom-res_rom)./abs(res_fom), '-.','color',ColMat(2,:),LineWidth=1);
+    xlabel('Frequency [Hz]')
+    ylabel('Error')
+    xlim([imag(interpPoints(1)), imag(interpPoints(end))])
+    
+    % Magnitude
+    subplot(2,1,2)
+    loglog(imag(interpPoints), res_fom,'--o','color',ColMat(1,:),'markersize',4,LineWidth=1); 
+    hold on;
+    loglog(imag(interpPoints), res_rom, '-.','color',ColMat(2,:),LineWidth=1);
+    xlabel('Frequency [Hz]')
+    ylabel('Magnitude')
+    legend('Full-order', 'Intermediate model')
+    xlim([imag(interpPoints(1)), imag(interpPoints(end))])
+end
+
 %% Frequency-limited balanced truncation from data.
 fprintf(1, '1a. Instantiate flQuadBTSampler class.\n')
 fprintf(1, '--------------------------------------\n')
@@ -67,8 +199,8 @@ fprintf(1, '--------------------------------------\n')
 % frequencies in which the transfer function is sampled.
 
 % Specify frequency-limited band along iR
-a     = -1;
-b     = 1;
+a     = -2;
+b     = -1;
 Omega = [10^a, 10^b];
 N     = 200;          % Number of quadrature nodes
 
@@ -79,10 +211,10 @@ N     = 200;          % Number of quadrature nodes
 % underlying sparse, second-order, system structure.
 sampler = flQuadBTSampler_so(M, D, K, B, C, n, m, p, 0);
 
-fprintf(1, '1b. Instantiate GeneralizedQuadBTReductor class.\n')
+fprintf(1, '1b. Instantiate flQuadBTReductor class.\n')
 fprintf(1, '------------------------------------------------\n')
 
-flQuadBT_Engine = GeneralizedQuadBTReductor(sampler, nodesl, nodesr, weightsl, ...
+flQuadBT_Engine = flQuadBTReductor(sampler, nodesl, nodesr, weightsl, ...
     weightsr);
 
 fprintf(1, '1c. COMPUTING DATA AND LOEWNER QUADRUPLE.\n')
@@ -129,7 +261,7 @@ end
 fprintf(1, '2. Computing frequency-limited reduced models.\n')
 fprintf(1, '----------------------------------------------\n')
 
-r = 20; % Reduction order
+r = 25; % Reduction order
 
 flQuadBT_start = tic;
 fprintf(1, 'COMPUTING REDUCED MODEL VIA flQuadBT (non-intrusive).\n')
@@ -160,46 +292,69 @@ Efo = [K, alpha * M; alpha * M, M];
 Bfo = [alpha * B; B];
 Cfo = [C, zeros(size(C))];
 
+solve_opts = struct( ...
+    'FctUpdate' , 1, ...
+    'Freqs'     , Omega, ...
+    'Info'      , 2, ...
+    'MaxIter'   , 100, ...
+    'MinIter'   , 10, ...
+    'ModGramian', 0, ...
+    'Npts'      , 1601, ...
+    'Shifts'    , 'imaginary', ...
+    'Solver'    , 'logm', ...
+    'SolverFreq', 1, ...
+    'StoreFacE' , 0, ...
+    'StoreV'    , 0, ...
+    'TolComp'   , eps, ...
+    'TolLyap'   , 1.0e-12, ...
+    'TolRHS'    , 1.0e-14, ...
+    'TrueRes'   , 1, ...
+    'L'         , [], ...
+    'pL'        , []);
 
 P_start = tic;
 fprintf(1, 'SOLVING FOR FREQUENCY-LIMITED CONTROLLABILITY GRAMIAN.\n')
 fprintf(1, '------------------------------------------------------\n')
-[Zcont, Ycont, infocont] = freq_lyap_rksm(Afo, Bfo, Efo);
-Pfl                      = Zcont*Ycont*Zcont';
+[ZCont, YCont, infoCont] = freq_lyap_rksm(Afo, Bfo, Efo, solve_opts);
 fprintf(1, 'COMPUTED IN %.2f s\n', toc(P_start))
+[XCont, LCont] = eig(YCont);
 
 Q_start = tic;
 fprintf(1, 'SOLVING FOR FREQUENCY-LIMITED OBSERVABILITY GRAMIAN.\n')
 fprintf(1, '----------------------------------------------------\n')
-[Zobsv, Yobsv, infoobsv] = freq_lyap_rksm(Afo', Cfo', Efo');
-Qfl                      = Zobsv*Yobsv*Zobsv';
+[ZObsv, YObsv, infoObsv] = freq_lyap_rksm(Afo', Cfo', Efo', solve_opts);
 fprintf(1, 'COMPUTED IN %.2f s\n', toc(Q_start))
+[XObsv, LObsv] = eig(YObsv);
 
-% Compute square root factors of Gramians, and take the svd of U'*L
-try
-    U = chol(Pfl);   
-    U = U';
-catch
-    U = chol(Pfl + eye(2*n, 2*n)*10e-10);   
-    U = U';
-end
-try
-    L = chol(Qfl);   
-    L = L';
-catch
-    L = chol(Qfl + eye(2*n, 2*n)*10e-6);    
-    L = L';
-end
-[Z, S, Y] = svd(U'*Efo*L);
+% Gramian is Pfl = Zcont*Ycont*Zcont'. Too large to form as dense matrix.
+% Instead:
+%   1. Factor [X, L] = eig(YCont);
+%   2. Based on truncation, keep leading eigenvalues
+%   3. Take ZContFact = Z*X(1:t)*sqrt(L(1:t));
+% And similarly for ZObsvFact
+LCont          = sort(diag(LCont), 'descend');
+tol            = 10e-14;
+t1             = find(LCont>tol, 1,'last'); % Truncation order
+LObsv          = sort(diag(LObsv), 'descend');
+tol            = 10e-14;
+t2             = find(LObsv>tol, 1,'last'); % Truncation order
+ZContFact      = ZCont*XCont(:, 1:t1)*diag(sqrt(LCont(1:t1)));
+ZObsvFact      = ZObsv*XObsv(:, 1:t2)*diag(sqrt(LObsv(1:t2)));
 
+% Formulate projection matrices
+[U, S, Y] = svd(ZObsvFact'*Efo*ZContFact);
+
+r = min([r, t1, t2]);
 % Compute projection matrices
-V = U*Z(:, 1:r)*S(1:r, 1:r)^(-1/2); % Right
-W = L*Y(:, 1:r)*S(1:r, 1:r)^(-1/2);% Left
+V = ZContFact*Y(:, 1:r)*S(1:r, 1:r)^(-1/2); % Right
+W = ZObsvFact*U(:, 1:r)*S(1:r, 1:r)^(-1/2); % Left
+
 
 % Compute reduced order model via projection
-Er_flBT = eye(r, r); Ar_flBT = W'*Afo*V;    
-Br_flBT = W'*Bfo;    Cr_flBT = Cfo*V;  
-Dr_flBT = 0;
+Er_flBTExact = eye(r, r); Ar_flBTExact = W'*Afo*V;    
+Br_flBTExact = W'*Bfo;    Cr_flBTExact = Cfo*V;  
+Dr_flBTExact = Dfo;
+
 
 fprintf(1, 'flBT REDUCED MODEL COMPUTED IN %.2f s\n', toc(flQuadBT_start))
 fprintf(1, '---------------------------------------\n')
@@ -213,7 +368,7 @@ fprintf(1, '---------------------------------------\n')
 
 %% Plot frequency response functions.
 lens           = 750;                   % No. of frequencies to sample at
-s              = logspace(-1, 5, lens); % Contains Omega (frequency band of interest)
+s              = logspace(-5, 1, lens); % Contains Omega (frequency band of interest)
 res_fom        = zeros(lens, 1);        % Response of full order model
 resr_flBT      = zeros(lens, 1);        % Response of (intrusive) flBT reduced model
 resr_flQuadbBT = zeros(lens, 1);        % Response of (non-intrusive) flQuadBT reduced model
@@ -225,7 +380,7 @@ for ii=1:lens
     fprintf(1, 'Frequency step %d, s=1i*%.2f ...\n ', ii, s(ii))
     % Evaluate transfer function magnitude
     Gfo                = Cfo*((1i*s(ii)*Efo - Afo)\Bfo) + Dfo;
-    Gr_flBT            = Cr_flBT*((1i*s(ii)*Er_flBT - Ar_flBT)\Br_flBT) + Dr_flBT;
+    Gr_flBT            = Cr_flBTExact*((1i*s(ii)*Er_flBTExact - Ar_flBTExact)\Br_flBTExact) + Dr_flBTExact;
     Gr_flQuadBT        = Cr_flQuadBT*((1i*s(ii)*Er_flQuadBT - Ar_flQuadBT)\Br_flQuadBT) + Dr_flQuadBT;
     res_fom(ii)        = norm(Gfo, 2); 
     resr_flBT(ii)      = norm(Gr_flBT, 2); 
@@ -244,7 +399,7 @@ ColMat(4,:) = [0.4660    0.6740    0.1880];
 ColMat(5,:) = [0.4940    0.1840    0.5560];
 ColMat(6,:) = [1 0.4 0.6];
 
-figure(1)
+figure(2)
 fs = 12;
 % Magnitudes
 set(gca, 'fontsize', 10)
