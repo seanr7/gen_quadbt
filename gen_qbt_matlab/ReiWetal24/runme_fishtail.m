@@ -41,6 +41,10 @@ fprintf(1, '\n');
 %% Load data.
 % From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Artificial_Fishtail
 load('data/Fishtail.mat')
+% Rayleigh Damping: D = alpha*M + beta*K
+%   alpha = 1e-4;
+%   beta  = 2*1e-4;
+D = 1e-4*M + 2*(1e-4)*K;
 
 %% Frequency-limited balanced truncation from data.
 
