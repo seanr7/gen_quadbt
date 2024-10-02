@@ -84,7 +84,7 @@ r = 25;
 
 % Transfer function data.
 recomputeSamples = true;
-% recomputeSamples = false;
+recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
