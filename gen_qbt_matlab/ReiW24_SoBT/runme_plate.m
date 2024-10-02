@@ -80,7 +80,7 @@ weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(2:end-
 weightsLeft  = sqrt(1 / (2 * pi)) * sqrt(abs(weightsLeft)); 
 
 % Order of reduction.
-r = 25;
+r = 20;
 
 % Transfer function data.
 recomputeSamples = true;
@@ -173,7 +173,7 @@ Dr_soQuadBT  = 1i*eta*Kr_soQuadBT;
 Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
 Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
 
-filename = 'results/roPlateTVA_soQuadBT_r25_N200.mat';
+filename = 'results/roPlateTVA_soQuadBT_r20_N200.mat';
 save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
 
 %% 2. soLoewner.
@@ -239,7 +239,7 @@ Dr_soLoewner  = 1i*eta*Kr_soLoewner;
 Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
 Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
 
-filename = 'results/roPlateTVA_soLoewner_r25_N200.mat';
+filename = 'results/roPlateTVA_soLoewner_r20_N200.mat';
 save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
 
 %% 3. foQuadBT.
@@ -314,7 +314,7 @@ Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(
 Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
 Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
 
-filename = 'results/roPlateTVA_foQuadBT_r25_N200.mat';
+filename = 'results/roPlateTVA_foQuadBT_r20_N200.mat';
 save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
 
 %% 4. soBT.
@@ -341,7 +341,7 @@ Kr_soBT = soBTRom_Rayleigh.K;
 Br_soBT = soBTRom_Rayleigh.Bu;
 Cpr_soBT = soBTRom_Rayleigh.Cp;
 
-filename = 'results/roPlateTVA_soBT_r25.mat';
+filename = 'results/roPlateTVA_soBT_r20.mat';
 save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
 
 %% Plots.
@@ -448,10 +448,10 @@ write = true;
 if write
     magMatrix = [s', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
         resp_soBT];
-    dlmwrite('results/plateTVAReducedOrderResponse_r25_N200.dat', magMatrix, ...
+    dlmwrite('results/plateTVAReducedOrderResponse_r20_N200.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
     errorMatrix = [s', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
-    dlmwrite('results/plateTVAReducedOrderError_r25_N200.dat', errorMatrix, ...
+    dlmwrite('results/plateTVAReducedOrderError_r20_N200.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
 
