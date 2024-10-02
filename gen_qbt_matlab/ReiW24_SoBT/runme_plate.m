@@ -169,7 +169,7 @@ end
 % Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
 Mr_soQuadBT  = eye(r, r);
 Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Dr_soQuadBT  = alpha*Mr_soQuadBT + beta*Kr_soQuadBT;
+Dr_soQuadBT  = 1i*eta*Kr_soQuadBT;
 Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
 Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
 
@@ -235,7 +235,7 @@ end
 % Compress.
 Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
 Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
-Dr_soLoewner  = alpha*Mr_soLoewner + beta*Kr_soLoewner;
+Dr_soLoewner  = 1i*eta*Kr_soLoewner;
 Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
 Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
 
