@@ -52,16 +52,19 @@ load('data/plateTVA.mat')
 % Rayleigh damping coefficients.
 eta = .001;
 D   = 1i*eta*K;
+p   = 1;
+m   = 1;
+n   = 201900;
 
 %% Reduced order models.
 
 % Frequencies used in the simulation.
 % s    = 1i*linspace(0,2*pi*250, 500); 
 % s_hz = imag(s)/2/pi; 
-nNodes = 200;          
+nNodes = 250;          
 
 % Compute nodes.
-omega      = 1i*(linspace(0, 2*pi*250, numNodes)');
+omega      = 1i*(linspace(0, 2*pi*250, nNodes)');
 nodesLeft  = omega(1:2:end);    
 nodesRight = omega(2:2:end); 
 % Close left and right nodes under complex conjugation.
