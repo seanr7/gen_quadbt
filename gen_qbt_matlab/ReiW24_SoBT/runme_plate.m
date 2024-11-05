@@ -46,10 +46,10 @@ fprintf(1, '----------------------------------------------\n')
 
 % From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Plate_with_tuned_vibration_absorbers
 % Hysteretic damping.
-%   eta = 
+%   eta = .001.
 load('data/plateTVA.mat')
 
-% Rayleigh damping coefficients.
+% Hysteretic damping matrix.
 eta = .001;
 D   = 1i*eta*K;
 p   = 1;
@@ -61,7 +61,7 @@ n   = 201900;
 % Frequencies used in the simulation.
 % s    = 1i*linspace(0,2*pi*250, 500); 
 % s_hz = imag(s)/2/pi; 
-nNodes = 250;          
+nNodes = 500;          
 
 % Compute nodes.
 omega      = 1i*(linspace(0, 2*pi*250, nNodes)');
@@ -80,15 +80,16 @@ weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(2:end-
 weightsLeft  = sqrt(1 / (2 * pi)) * sqrt(abs(weightsLeft)); 
 
 % Order of reduction.
-r = 20;
+r = 25;
 
 % Transfer function data.
 recomputeSamples = true;
-recomputeSamples = false;
+% recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
     % Space allocation.
+    % Amounts to two 28278 x 200 dense matrices.
     GsLeft  = zeros(p, m, nNodes);
     GsRight = zeros(p, m, nNodes);
     for k = 1:nNodes
@@ -102,12 +103,13 @@ if recomputeSamples
         fprintf(1, 'Solves finished in %.2f s.\n',toc)
         fprintf(1, '-----------------------------\n');
     end
-    save('results/plateTVA_Samples_0to250Hz.mat', 'GsLeft', 'GsRight', ...
-        'nodesLeft', 'nodesRight')
+    save('results/plateTVA_HystereticSamples_N500_0to250Hz.mat', ...
+        'GsLeft', 'GsRight', 'nodesLeft', 'nodesRight')
 else
     fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
     fprintf(1, '-------------------------------------------\n')
-    load('results/plateTVA_Samples_0to250Hz.mat', 'GsLeft', 'GsRight')
+    load('results/plateTVA_HystereticSamples_N500_0to250Hz.mat', ...
+        'GsLeft', 'GsRight')
 end
 
 % Non-intrusive methods.
@@ -123,8 +125,8 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-% checkLoewner = true;
-checkLoewner = false;
+checkLoewner = true;
+% checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soQuadBT).\n')
     fprintf(1, '------------------------------------------------------------------------------------------\n')
@@ -164,17 +166,22 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-[Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
-% Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Mr_soQuadBT  = eye(r, r);
-Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Dr_soQuadBT  = 1i*eta*Kr_soQuadBT;
-Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
-
-filename = 'results/roPlateTVA_soQuadBT_r20_N200.mat';
-save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
+recomputeModel = true;
+if recomputeModel
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
+    % Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Mr_soQuadBT  = eye(r, r);
+    Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT  = 1i*eta*Kr_soQuadBT;
+    Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+    
+    filename = 'results/roPlateTVA_soQuadBT_r25_N500.mat';
+    save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
+else
+    load('results/roPlateTVA_soQuadBT_r25_N500.mat')
+end
 
 %% 2. soLoewner.
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE (soLoewner).\n')
@@ -227,20 +234,25 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-% Relevant SVDs.
-[Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
-[~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
-
-% Compress.
-Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
-Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
-Dr_soLoewner  = 1i*eta*Kr_soLoewner;
-Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
-Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
-
-filename = 'results/roPlateTVA_soLoewner_r20_N200.mat';
-save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
+recomputeModel = true;
+if recomputeModel
+    % Reductor.
+    % Relevant SVDs.
+    [Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
+    [~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
+    
+    % Compress.
+    Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
+    Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
+    Dr_soLoewner  = 1i*eta*Kr_soLoewner;
+    Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
+    Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
+    
+    filename = 'results/roPlateTVA_soLoewner_r25_N500.mat';
+    save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
+else
+    load('results/roPlateTVA_soLoewner_r25_N500.mat')
+end
 
 %% 3. foQuadBT.
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE (foQuadBT).\n')
@@ -307,46 +319,57 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-[Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
-Er_foQuadBT  = eye(r, r);
-Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
-Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
-Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
-
-filename = 'results/roPlateTVA_foQuadBT_r20_N200.mat';
-save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
+recomputeModel = true;
+if recomputeModel
+    % Reductor.
+    [Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
+    Er_foQuadBT  = eye(r, r);
+    Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
+    Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
+    Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
+    
+    filename = 'results/roPlateTVA_foQuadBT_r25_N500.mat';
+    save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
+else
+    load('results/roPlateTVA_foQuadBT_r25_N500.mat')
+end
 
 %% 4. soBT.
-soSys    = struct();
-soSys.M  = M;
-soSys.E  = D;
-soSys.K  = K;
-soSys.Bu = B;
-soSys.Cp = C;
-soSys.Cv = zeros(p, n);
-soSys.D  = zeros(p, m);
-
-% Input opts.
-opts                  = struct();
-opts.BalanceType      = 'pv';
-opts.Order            = r;
-opts.OrderComputation = 'order';
-opts.OutputModel      = 'so';
-
-[soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
-Mr_soBT = soBTRom_Rayleigh.M;
-Dr_soBT = soBTRom_Rayleigh.E;
-Kr_soBT = soBTRom_Rayleigh.K;
-Br_soBT = soBTRom_Rayleigh.Bu;
-Cpr_soBT = soBTRom_Rayleigh.Cp;
-
-filename = 'results/roPlateTVA_soBT_r20.mat';
-save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
+recomputeModel = true;
+if recomputeModel
+    soSys    = struct();
+    soSys.M  = M;
+    soSys.E  = D;
+    soSys.K  = K;
+    soSys.Bu = B;
+    soSys.Cp = C;
+    soSys.Cv = zeros(p, n);
+    soSys.D  = zeros(p, m);
+    
+    % Input opts.
+    opts                  = struct();
+    opts.BalanceType      = 'pv';
+    opts.Order            = r;
+    opts.OrderComputation = 'order';
+    opts.OutputModel      = 'so';
+    
+    [soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
+    Mr_soBT = soBTRom_Rayleigh.M;
+    Dr_soBT = soBTRom_Rayleigh.E;
+    Kr_soBT = soBTRom_Rayleigh.K;
+    Br_soBT = soBTRom_Rayleigh.Bu;
+    Cpr_soBT = soBTRom_Rayleigh.Cp;
+    
+    filename = 'results/roPlateTVA_soBT_r25.mat';
+    save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
+else
+    load('results/roPlateTVA_soBT_r25.mat')
+end
 
 %% Plots.
 numSamples      = 500;
 s               = 1i*linspace(0, 2*pi*250, numSamples);
+s_hz            = imag(s)/2/pi;
 resp_soQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) soQuadBT reduced model
 error_soQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) soQuadBT reduced model
 resp_soLoewner  = zeros(numSamples, 1);          % Response of (non-intrusive) soLoewner reduced model
@@ -362,7 +385,7 @@ recompute = true;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
-    fprintf(1, 'Sampling full-order transfer function along i[1e2, 1e7].\n')
+    fprintf(1, 'Sampling full-order transfer function along 0 to 250 Hz.\n')
     fprintf(1, '--------------------------------------------------------\n')
     for ii = 1:numSamples
         timeSolve = tic;
@@ -399,6 +422,18 @@ for ii=1:numSamples
     fprintf(1, '----------------------------------------------------------------------\n');
 end
 
+% Convert to [dB].
+GfoResp        = 10*log10(abs(GfoResp)/1e-9); 
+resp_soQuadBT  = 10*log10(abs(resp_soQuadBT)/1e-9); 
+resp_soLoewner = 10*log10(abs(resp_soLoewner)/1e-9); 
+resp_foQuadBT  = 10*log10(abs(resp_foQuadBT)/1e-9); 
+resp_soBT      = 10*log10(abs(resp_soBT)/1e-9); 
+
+error_soQuadBT  = 10*log10(abs(error_soQuadBT)/1e-9); 
+error_soLoewner = 10*log10(abs(error_soLoewner)/1e-9); 
+error_foQuadBT  = 10*log10(abs(error_foQuadBT)/1e-9); 
+error_soBT      = 10*log10(abs(error_soBT)/1e-9); 
+
 % plotResponse = true;
 plotResponse = false;
 if plotResponse
@@ -416,41 +451,47 @@ if plotResponse
     % Magnitudes
     set(gca, 'fontsize', 10)
     subplot(2,1,1)
-    loglog(imag(s), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
-    loglog(imag(s), resp_soQuadBT,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
-    loglog(imag(s), resp_foQuadBT,  '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
-    loglog(imag(s), resp_soLoewner,  '--', 'linewidth', 2, 'color', ColMat(4,:)); 
-    loglog(imag(s), resp_soBT, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
+    plot((s_hz), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
+    plot((s_hz), resp_soQuadBT,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
+    plot((s_hz), resp_foQuadBT,  '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
+    plot((s_hz), resp_soLoewner,  '--', 'linewidth', 2, 'color', ColMat(4,:)); 
+    % loglog(imag(s), resp_soBT, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
     leg = legend('Full-order', 'soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
-    xlim([imag(s(1)), imag(s(end))])
+    xlim([(s_hz(1)), (s_hz(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
-    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
-    ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
+    xlabel('s [Hz]', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('Magnitude [dB]', 'fontsize', fs, 'interpreter', 'latex')
     
     % Relative errors
     subplot(2,1,2)
-    loglog(imag(s), error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
-    loglog(imag(s), error_foQuadBT, '-*', 'linewidth', 2, 'color', ColMat(3,:));
-    loglog(imag(s), error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-    loglog(imag(s), error_soBT, '-*', 'linewidth', 2, 'color', ColMat(5,:));
+    semilogy((s_hz), error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    semilogy((s_hz), error_foQuadBT, '-*', 'linewidth', 2, 'color', ColMat(3,:));
+    semilogy((s_hz), error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
+    % loglog(imag(s), error_soBT, '-*', 'linewidth', 2, 'color', ColMat(5,:));
     leg = legend('soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
-    xlim([imag(s(1)), imag(s(end))])
+    xlim([(s_hz(1)), (s_hz(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
-    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
-    ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
+    xlabel('s [Hz]', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('Relative error [dB]', 'fontsize', ...
         fs, 'interpreter', 'latex')
 end
 
 % Store data.
 write = true;
 if write
-    magMatrix = [s', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
-        resp_soBT];
+    % magMatrix = [s', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
+    %     resp_soBT];
+    % dlmwrite('results/plateTVAReducedOrderResponse_r20_N200.dat', magMatrix, ...
+    %     'delimiter', '\t', 'precision', 8);
+    % errorMatrix = [s', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
+    % dlmwrite('results/plateTVAReducedOrderError_r20_N200.dat', errorMatrix, ...
+    %     'delimiter', '\t', 'precision', 8);
+    magMatrix = [(s_hz)', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner];
     dlmwrite('results/plateTVAReducedOrderResponse_r20_N200.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
-    errorMatrix = [s', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
+    errorMatrix = [(s_hz)', error_soQuadBT, error_foQuadBT, error_soLoewner];
     dlmwrite('results/plateTVAReducedOrderError_r20_N200.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end

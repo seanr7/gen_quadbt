@@ -45,15 +45,15 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightP
 %                       DParam = eta, material damping coefficient
 %
 % OUTPUTS: 
-%   MBAR - nLeft*p x nRight*m diagonally scaled Loewner matrix; 
+%   MBAR  - nLeft*p x nRight*m diagonally scaled Loewner matrix; 
 %          corresponds to mass matrix M in so system realization 
-%   DBAR - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
+%   DBAR  - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
 %          corresponds to damping matrix D in so system realization 
-%   KBAR - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
+%   KBAR  - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
 %          corresponds to stiffness matrix K in so system realization 
-%   BBAR - nLeft*p x m matrix of left data; in (3) corresponds to input 
+%   BBAR  - nLeft*p x m matrix of left data; in (3) corresponds to input 
 %          matrix B in so system realization
-%   CBAR - p x nRight*m matrix of right data in (4); corresponds to 
+%   CBAR  - p x nRight*m matrix of right data in (4); corresponds to 
 %          (position) output matrix C in so system realization
 % 
 
@@ -101,8 +101,8 @@ end
 MBAR = zeros(nLeft*p, nRight*m);
 DBAR = zeros(nLeft*p, nRight*m);
 KBAR = zeros(nLeft*p, nRight*m);
-BBAR   = zeros(nLeft*p, m);
-CBAR   = zeros(p, nRight*m);
+BBAR = zeros(nLeft*p, m);
+CBAR = zeros(p, nRight*m);
 
 % Calculation of HBAR, GBAR, same regardless of damping model.
 for k = 1:nLeft
