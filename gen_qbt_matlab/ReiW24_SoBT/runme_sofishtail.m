@@ -57,15 +57,27 @@ beta  = 2e-4;
 D     = alpha*M + beta*K;
 
 %% Reduced order models.
-% Test performance from i[1e-2, 1e6].
-a = -1;  b = 4;  nNodes = 200;          
+% Test performance from 1e-1 to 1e-4 [Hz].
+a = 0;  b = 3;  nNodes = 200;          
+
+% Compute nodes.
+omega      = 1i*(2*pi)*(logspace(0, 3, nNodes)'); % Convert to [Hz].
+nodesLeft  = omega(1:2:end);    
+nodesRight = omega(2:2:end); 
+% Close left and right nodes under complex conjugation.
+nodesLeft  = ([nodesLeft; conj(flipud(nodesLeft))]);     
+nodesRight = ([nodesRight; conj(flipud(nodesRight))]);
 
 % Prepare quadrature weights and nodes according to Trapezoidal rule.
-[nodesLeft, weightsLeft, nodesRight, weightsRight] = trapezoidal_rule([a, b], ...
-    nNodes, true);
+weightsRight = [nodesRight(2) - nodesRight(1); nodesRight(3:end) - nodesRight(2:end-1); ...
+    nodesRight(end) - nodesRight(end-1)]./2;
+weightsRight = sqrt(1 / (2 * pi)) * sqrt(abs(weightsRight));   
+weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(2:end-1); ...
+    nodesLeft(end) - nodesLeft(end-1)]./2; 
+weightsLeft  = sqrt(1 / (2 * pi)) * sqrt(abs(weightsLeft)); 
 
 % Order of reduction.
-r = 10;
+r = 25;
 
 % Transfer function data.
 recomputeSamples = true;
@@ -87,12 +99,12 @@ if recomputeSamples
         fprintf(1, 'Solves finished in %.2f s.\n',toc)
         fprintf(1, '-----------------------------\n');
     end
-    save('results/Fishtail_Samples_1e-1to1e5.mat', 'GsLeft', 'GsRight', ...
+    save('results/Fishtail_Samples_1e0to1e3Hz.mat', 'GsLeft', 'GsRight', ...
         'nodesLeft', 'nodesRight')
 else
     fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
     fprintf(1, '-------------------------------------------\n')
-    load('results/Fishtail_Samples_1e-1to1e5.mat', 'GsLeft', 'GsRight')
+    load('results/Fishtail_Samples_1e0to1e3Hz.mat', 'GsLeft', 'GsRight')
 end
 
 % Non-intrusive methods.
@@ -149,17 +161,22 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-[Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
-% Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Mr_soQuadBT  = eye(r, r);
-Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Dr_soQuadBT  = alpha*Mr_soQuadBT + beta*Kr_soQuadBT;
-Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
-
-filename = 'results/roFishtail_soQuadBT_r10_N200.mat';
-save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
+recomputeModel = true;
+if recomputeModel
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
+    % Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Mr_soQuadBT  = eye(r, r);
+    Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT  = alpha*Mr_soQuadBT + beta*Kr_soQuadBT;
+    Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+    
+    filename = 'results/roFishtail_soQuadBT_r25_N200.mat';
+    save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
+else
+    load('results/roFishtail_soQuadBT_25_N200.mat')
+end
 
 %% 2. soLoewner.
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE (soLoewner).\n')
@@ -212,20 +229,26 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-% Relevant SVDs.
-[Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
-[~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
 
-% Compress.
-Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
-Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
-Dr_soLoewner  = alpha*Mr_soLoewner + beta*Kr_soLoewner;
-Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
-Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
-
-filename = 'results/roFishtail_soLoewner_r10_N200.mat';
-save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
+recomputeModel = true;
+if recomputeModel
+    % Reductor.
+    % Relevant SVDs.
+    [Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
+    [~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
+    
+    % Compress.
+    Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
+    Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
+    Dr_soLoewner  = alpha*Mr_soLoewner + beta*Kr_soLoewner;
+    Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
+    Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
+    
+    filename = 'results/roFishtail_soLoewner_r25_N200.mat';
+    save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
+else
+    load('results/roFishtail_soLoewner_r25_N200.mat')
+end
 
 %% 3. foQuadBT.
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE (foQuadBT).\n')
@@ -292,46 +315,57 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-[Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
-Er_foQuadBT  = eye(r, r);
-Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
-Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
-Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
-
-filename = 'results/roFishtail_foQuadBT_r10_N200.mat';
-save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
+recomputeModel = true;
+if recomputeModel
+    % Reductor.
+    [Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
+    Er_foQuadBT  = eye(r, r);
+    Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
+    Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
+    Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
+    
+    filename = 'results/roFishtail_foQuadBT_r25_N200.mat';
+    save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
+else
+    load('results/roFishtail_foQuadBT_r25_N200.mat')
+end
 
 %% 4. soBT.
-soSys    = struct();
-soSys.M  = M;
-soSys.E  = D;
-soSys.K  = K;
-soSys.Bu = B;
-soSys.Cp = C;
-soSys.Cv = zeros(p, n);
-soSys.D  = zeros(p, m);
-
-% Input opts.
-opts                  = struct();
-opts.BalanceType      = 'pv';
-opts.Order            = r;
-opts.OrderComputation = 'order';
-opts.OutputModel      = 'so';
-
-[soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
-Mr_soBT = soBTRom_Rayleigh.M;
-Dr_soBT = soBTRom_Rayleigh.E;
-Kr_soBT = soBTRom_Rayleigh.K;
-Br_soBT = soBTRom_Rayleigh.Bu;
-Cpr_soBT = soBTRom_Rayleigh.Cp;
-
-filename = 'results/roFishtail_soBT_r10.mat';
-save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
+recomputeModel = true;
+if recomputeModel
+    soSys    = struct();
+    soSys.M  = M;
+    soSys.E  = D;
+    soSys.K  = K;
+    soSys.Bu = B;
+    soSys.Cp = C;
+    soSys.Cv = zeros(p, n);
+    soSys.D  = zeros(p, m);
+    
+    % Input opts.
+    opts                  = struct();
+    opts.BalanceType      = 'pv';
+    opts.Order            = r;
+    opts.OrderComputation = 'order';
+    opts.OutputModel      = 'so';
+    
+    [soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
+    Mr_soBT = soBTRom_Rayleigh.M;
+    Dr_soBT = soBTRom_Rayleigh.E;
+    Kr_soBT = soBTRom_Rayleigh.K;
+    Br_soBT = soBTRom_Rayleigh.Bu;
+    Cpr_soBT = soBTRom_Rayleigh.Cp;
+    
+    filename = 'results/roFishtail_soBT_r25.mat';
+    save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
+else
+    load('results/roFishtail_soBT_r25.mat')
+end
 
 %% Plots.
 numSamples      = 500;
-s               = 1i*logspace(-2, 6, numSamples);
+s               = 1i*(2*pi)*logspace(-1, 4, numSamples);
+s_hz            = imag(s)/2/pi;
 resp_soQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) soQuadBT reduced model
 error_soQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) soQuadBT reduced model
 resp_soLoewner  = zeros(numSamples, 1);          % Response of (non-intrusive) soLoewner reduced model
@@ -356,11 +390,11 @@ if recompute
         GfoResp(ii)   = norm(Gfo(:, :, ii), 2);
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
-    save('results/FishtailFullOrderSimData_1e-2to1e6.mat', 'Gfo', 'GfoResp')
+    save('results/FishtailFullOrderSimData_1e-1to1e4Hz.mat', 'Gfo', 'GfoResp')
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
-    load('results/FishtailFullOrderSimData_1e-2to1e6.mat')
+    load('results/FishtailFullOrderSimData_1e-1to1e4Hz.mat')
 end
 
 % Compute frequency response along imaginary axis.
@@ -401,29 +435,29 @@ if plotResponse
     % Magnitudes
     set(gca, 'fontsize', 10)
     subplot(2,1,1)
-    loglog(imag(s), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
-    loglog(imag(s), resp_soQuadBT,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
-    loglog(imag(s), resp_foQuadBT,  '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
-    loglog(imag(s), resp_soLoewner,  '--', 'linewidth', 2, 'color', ColMat(4,:)); 
-    loglog(imag(s), resp_soBT, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
+    loglog(s_hz, GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
+    loglog(s_hz, resp_soQuadBT,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
+    loglog(s_hz, resp_foQuadBT,  '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
+    loglog(s_hz, resp_soLoewner,  '--', 'linewidth', 2, 'color', ColMat(4,:)); 
+    loglog(s_hz, resp_soBT, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
     leg = legend('Full-order', 'soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
-    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    xlabel('s [Hz]', 'fontsize', fs, 'interpreter', 'latex')
     ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
     
     % Relative errors
     subplot(2,1,2)
-    loglog(imag(s), error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
-    loglog(imag(s), error_foQuadBT, '-*', 'linewidth', 2, 'color', ColMat(3,:));
-    loglog(imag(s), error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-    loglog(imag(s), error_soBT, '-*', 'linewidth', 2, 'color', ColMat(5,:));
+    loglog(s_hz, error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    loglog(s_hz, error_foQuadBT, '-*', 'linewidth', 2, 'color', ColMat(3,:));
+    loglog(s_hz, error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
+    loglog(s_hz, error_soBT, '-*', 'linewidth', 2, 'color', ColMat(5,:));
     leg = legend('soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
-    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    xlabel('s [Hz]', 'fontsize', fs, 'interpreter', 'latex')
     ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
         fs, 'interpreter', 'latex')
 end
@@ -431,12 +465,12 @@ end
 % Store data.
 write = true;
 if write
-    magMatrix = [s', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
+    magMatrix = [s_hz', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
         resp_soBT];
-    dlmwrite('results/FishtailReducedOrderResponse_r10_N200.dat', magMatrix, ...
+    dlmwrite('results/FishtailReducedOrderResponse_r25_N200.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
-    errorMatrix = [s', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
-    dlmwrite('results/FishtailReducedOrderError_r10_N200.dat', errorMatrix, ...
+    errorMatrix = [s_hz', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
+    dlmwrite('results/FishtailReducedOrderError_r25_N200.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
 
