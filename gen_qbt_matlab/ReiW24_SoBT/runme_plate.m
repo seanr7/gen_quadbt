@@ -49,22 +49,25 @@ fprintf(1, '----------------------------------------------\n')
 %   eta = .001.
 load('data/plateTVA.mat')
 
+% Set C to average 
+% Cp = ones(1, n)/n;
 % Hysteretic damping matrix.
 eta = .001;
 D   = 1i*eta*K;
 p   = 1;
 m   = 1;
 n   = 201900;
+Cp  = ones(1, n)/n;
 
 %% Reduced order models.
 
 % Frequencies used in the simulation.
 % s    = 1i*linspace(0,2*pi*250, 500); 
 % s_hz = imag(s)/2/pi; 
-nNodes = 500;          
+nNodes = 250;          
 
 % Compute nodes.
-omega      = 1i*(linspace(0, 2*pi*250, nNodes)');
+omega      = 1i*(linspace(1, 2*pi*251, nNodes)');
 nodesLeft  = omega(1:2:end);    
 nodesRight = omega(2:2:end); 
 % Close left and right nodes under complex conjugation.
@@ -80,7 +83,7 @@ weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(2:end-
 weightsLeft  = sqrt(1 / (2 * pi)) * sqrt(abs(weightsLeft)); 
 
 % Order of reduction.
-r = 25;
+r = 50;
 
 % Transfer function data.
 recomputeSamples = true;
@@ -98,17 +101,18 @@ if recomputeSamples
         fprintf(1, 'Linear solve %d of %d.\n', k, nNodes)
         fprintf(1, '-----------------------------\n');
         % Transfer function data.
-        GsRight(:, :, k) = C*((nodesRight(k)^2.*M + nodesRight(k).*D + K)\B);
-        GsLeft(:, :, k)  = C*((nodesLeft(k)^2.*M  + nodesLeft(k).*D  + K)\B);
+        % No s*D due to Hysteretic damping.
+        GsRight(:, :, k) = Cp*((nodesRight(k)^2.*M + D + K)\B);
+        GsLeft(:, :, k)  = Cp*((nodesLeft(k)^2.*M  + D + K)\B);
         fprintf(1, 'Solves finished in %.2f s.\n',toc)
         fprintf(1, '-----------------------------\n');
     end
-    save('results/plateTVA_HystereticSamples_N500_0to250Hz.mat', ...
+    save('results/plateTVA_HystereticSamples_N250_1to251Hz.mat', ...
         'GsLeft', 'GsRight', 'nodesLeft', 'nodesRight')
 else
     fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
     fprintf(1, '-------------------------------------------\n')
-    load('results/plateTVA_HystereticSamples_N500_0to250Hz.mat', ...
+    load('results/plateTVA_HystereticSamples_N250_1to251Hz.mat', ...
         'GsLeft', 'GsRight')
 end
 
@@ -125,8 +129,8 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-checkLoewner = true;
-% checkLoewner = false;
+% checkLoewner = true;
+checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soQuadBT).\n')
     fprintf(1, '------------------------------------------------------------------------------------------\n')
@@ -140,11 +144,11 @@ if checkLoewner
     for k = 1:nNodes
         % For (position) controllability Gramian.
         rightContFactor(:, (k - 1)*m + 1:k*m) = weightsRight(k)*(((nodesRight(k)^2.*M ...
-            + nodesRight(k).*D + K)\B));
+            + D + K)\B));
 
         % For (velocity) observability Gramian.
         leftObsvFactor(:, (k - 1)*p + 1:k*p)  = conj(weightsLeft(k))*(((conj(nodesLeft(k))^2.*M' ...
-            + conj(nodesLeft(k)).*D' + K')\C'));
+            + D' + K')\Cp'));
     end
     fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeFactors))
     fprintf(1, '------------------------------------------\n')
@@ -159,7 +163,7 @@ if checkLoewner
     fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
         norm(leftObsvFactor' * B - Bbar_soQuadBT, 2))
     fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                    ||_2: %.16f\n', ...
-        norm(C * rightContFactor - CpBar_soQuadBT, 2))
+        norm(Cp * rightContFactor - CpBar_soQuadBT, 2))
     fprintf('-----------------------------------------------------------------------------------\n')
 else
     fprintf(1, 'Not verifying Loewner build; moving on.\n')
@@ -177,10 +181,10 @@ if recomputeModel
     Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
     
-    filename = 'results/roPlateTVA_soQuadBT_r25_N500.mat';
+    filename = 'results/roPlateTVA_soQuadBT_r50_N250.mat';
     save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
 else
-    load('results/roPlateTVA_soQuadBT_r25_N500.mat')
+    load('results/roPlateTVA_soQuadBT_r50_N250.mat')
 end
 
 %% 2. soLoewner.
@@ -208,11 +212,11 @@ if checkLoewner
     for k = 1:nNodes
         % For (position) controllability Gramian.
         rightContFactor(:, (k - 1)*m + 1:k*m) = (((nodesRight(k)^2.*M ...
-            + nodesRight(k).*D + K)\B));
+            + D + K)\B));
 
         % For (velocity) observability Gramian.
         leftObsvFactor(:, (k - 1)*p + 1:k*p)  = (((conj(nodesLeft(k))^2.*M' ...
-            + conj(nodesLeft(k)).*D' + K')\C'));
+            + D' + K')\Cp'));
     end
     fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeFactors))
     fprintf(1, '------------------------------------------\n')
@@ -227,7 +231,7 @@ if checkLoewner
     fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
         norm(leftObsvFactor' * B - Bbar_soLoewner, 2))
     fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                   ||_2: %.16f\n', ...
-        norm(C * rightContFactor - CpBar_soLoewner, 2))
+        norm(Cp * rightContFactor - CpBar_soLoewner, 2))
     fprintf('-----------------------------------------------------------------------------------\n')
 else
     fprintf(1, 'Not verifying Loewner build; moving on.\n')
@@ -248,10 +252,10 @@ if recomputeModel
     Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
     Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
     
-    filename = 'results/roPlateTVA_soLoewner_r25_N500.mat';
+    filename = 'results/roPlateTVA_soLoewner_r50_N250.mat';
     save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
 else
-    load('results/roPlateTVA_soLoewner_r25_N500.mat')
+    load('results/roPlateTVA_soLoewner_r50_N250.mat')
 end
 
 %% 3. foQuadBT.
@@ -287,11 +291,11 @@ if checkLoewner
     Afo(n+1:2*n, 1:n)     = -K;                                     % (2, 1) block is -K
     Afo(n+1:2*n, n+1:2*n) = -D;                                     % (2, 2) block is -D 
     
-    Bfo             = spalloc(2*n, 1, nnz(B)); % Bfo = [0; B];
+    Bfo             = spalloc(2*n, m, nnz(B)); % Bfo = [0; B];
     Bfo(n+1:2*n, :) = B; 
 
-    Cfo         = spalloc(12, 2*n, nnz(C)); % Bfo = [Cp, 0];
-    Cfo(:, 1:n) = C; 
+    Cfo         = spalloc(p, 2*n, nnz(Cp)); % Bfo = [Cp, 0];
+    Cfo(:, 1:n) = Cp; 
 
 
     for k = 1:nNodes
@@ -328,14 +332,14 @@ if recomputeModel
     Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
     Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
     
-    filename = 'results/roPlateTVA_foQuadBT_r25_N500.mat';
+    filename = 'results/roPlateTVA_foQuadBT_r50_N250.mat';
     save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
 else
-    load('results/roPlateTVA_foQuadBT_r25_N500.mat')
+    load('results/roPlateTVA_foQuadBT_r50_N250.mat')
 end
 
 %% 4. soBT.
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     soSys    = struct();
     soSys.M  = M;
@@ -360,15 +364,15 @@ if recomputeModel
     Br_soBT = soBTRom_Rayleigh.Bu;
     Cpr_soBT = soBTRom_Rayleigh.Cp;
     
-    filename = 'results/roPlateTVA_soBT_r25.mat';
+    filename = 'results/roPlateTVA_soBT_r50.mat';
     save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
 else
-    load('results/roPlateTVA_soBT_r25.mat')
+    % load('results/roPlateTVA_soBT_r50.mat')
 end
 
 %% Plots.
 numSamples      = 500;
-s               = 1i*linspace(0, 2*pi*250, numSamples);
+s               = 1i*linspace(1, 2*pi*251, numSamples);
 s_hz            = imag(s)/2/pi;
 resp_soQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) soQuadBT reduced model
 error_soQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) soQuadBT reduced model
@@ -390,7 +394,7 @@ if recompute
     for ii = 1:numSamples
         timeSolve = tic;
         fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, s(ii))
-        Gfo(:, :, ii) = C*((s(ii)^2*M +s(ii)*D + K)\B);
+        Gfo(:, :, ii) = Cp*((s(ii)^2*M + D + K)\B);
         GfoResp(ii)   = norm(Gfo(:, :, ii), 2);
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
@@ -398,17 +402,19 @@ if recompute
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
-    load('results/plateTVAFullOrderSimData_0to250Hz.mat')
+    load('results/plateTVAFullOrderSimData_1to251Hz.mat')
 end
 
 % Compute frequency response along imaginary axis.
 for ii=1:numSamples
     fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, real(s(ii)))
     % Transfer functions.
-    Gr_soQuadBT         = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT + Kr_soQuadBT)\Br_soQuadBT);
+    Gr_soQuadBT         = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + Dr_soQuadBT + Kr_soQuadBT)\Br_soQuadBT);
+    % TODO: I think there needs to be some frequency dependence in the Ar
+    % matrix ... But this is for the ROM, can fix later.
     Gr_foQuadBT         = Cr_foQuadBT*((s(ii)*Er_foQuadBT + Ar_foQuadBT)\Br_foQuadBT);
-    Gr_soLoewner        = Cpr_soLoewner*((s(ii)^2*Mr_soLoewner + s(ii)*Dr_soLoewner + Kr_soLoewner)\Br_soLoewner);
-    Gr_soBT             = Cpr_soBT*((s(ii)^2*Mr_soBT + s(ii)*Dr_soBT + Kr_soBT)\Br_soBT);
+    Gr_soLoewner        = Cpr_soLoewner*((s(ii)^2*Mr_soLoewner + Dr_soLoewner + Kr_soLoewner)\Br_soLoewner);
+    % Gr_soBT             = Cpr_soBT*((s(ii)^2*Mr_soBT + s(ii)*Dr_soBT + Kr_soBT)\Br_soBT);
 
     % Response and errors. 
     resp_soQuadBT(ii)   = norm(Gr_soQuadBT, 2); 
@@ -417,8 +423,8 @@ for ii=1:numSamples
     error_foQuadBT(ii)  = norm(Gfo(:, :, ii) - Gr_foQuadBT, 2)/GfoResp(ii); 
     resp_soLoewner(ii)  = norm(Gr_soLoewner, 2); 
     error_soLoewner(ii) = norm(Gfo(:, :, ii) - Gr_soLoewner, 2)/GfoResp(ii); 
-    resp_soBT(ii)       = norm(Gr_soBT, 2); 
-    error_soBT(ii)      = norm(Gfo(:, :, ii) - Gr_soBT, 2)/GfoResp(ii); 
+    % resp_soBT(ii)       = norm(Gr_soBT, 2); 
+    % error_soBT(ii)      = norm(Gfo(:, :, ii) - Gr_soBT, 2)/GfoResp(ii); 
     fprintf(1, '----------------------------------------------------------------------\n');
 end
 
@@ -427,12 +433,12 @@ GfoResp        = 10*log10(abs(GfoResp)/1e-9);
 resp_soQuadBT  = 10*log10(abs(resp_soQuadBT)/1e-9); 
 resp_soLoewner = 10*log10(abs(resp_soLoewner)/1e-9); 
 resp_foQuadBT  = 10*log10(abs(resp_foQuadBT)/1e-9); 
-resp_soBT      = 10*log10(abs(resp_soBT)/1e-9); 
+% resp_soBT      = 10*log10(abs(resp_soBT)/1e-9); 
 
 error_soQuadBT  = 10*log10(abs(error_soQuadBT)/1e-9); 
 error_soLoewner = 10*log10(abs(error_soLoewner)/1e-9); 
 error_foQuadBT  = 10*log10(abs(error_foQuadBT)/1e-9); 
-error_soBT      = 10*log10(abs(error_soBT)/1e-9); 
+% error_soBT      = 10*log10(abs(error_soBT)/1e-9); 
 
 % plotResponse = true;
 plotResponse = false;
