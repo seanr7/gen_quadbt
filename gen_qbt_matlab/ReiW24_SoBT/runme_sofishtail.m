@@ -77,10 +77,10 @@ weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(2:end-
 weightsLeft  = sqrt(1 / (2 * pi)) * sqrt(abs(weightsLeft)); 
 
 % Order of reduction.
-r = 25;
+r = 5;
 
 % Transfer function data.
-recomputeSamples = true;
+recomputeSamples = false;
 % recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
@@ -172,10 +172,10 @@ if recomputeModel
     Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
     
-    filename = 'results/roFishtail_soQuadBT_r25_N200.mat';
+    filename = 'results/roFishtail_soQuadBT_r5_N200.mat';
     save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
 else
-    load('results/roFishtail_soQuadBT_25_N200.mat')
+    load('results/roFishtail_soQuadBT_r5_N200.mat')
 end
 
 %% 2. soLoewner.
@@ -244,10 +244,10 @@ if recomputeModel
     Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
     Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
     
-    filename = 'results/roFishtail_soLoewner_r25_N200.mat';
+    filename = 'results/roFishtail_soLoewner_r5_N200.mat';
     save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
 else
-    load('results/roFishtail_soLoewner_r25_N200.mat')
+    load('results/roFishtail_soLoewner_r5_N200.mat')
 end
 
 %% 3. foQuadBT.
@@ -324,10 +324,10 @@ if recomputeModel
     Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
     Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
     
-    filename = 'results/roFishtail_foQuadBT_r25_N200.mat';
+    filename = 'results/roFishtail_foQuadBT_r5_N200.mat';
     save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
 else
-    load('results/roFishtail_foQuadBT_r25_N200.mat')
+    load('results/roFishtail_foQuadBT_r5_N200.mat')
 end
 
 %% 4. soBT.
@@ -356,10 +356,10 @@ if recomputeModel
     Br_soBT = soBTRom_Rayleigh.Bu;
     Cpr_soBT = soBTRom_Rayleigh.Cp;
     
-    filename = 'results/roFishtail_soBT_r25.mat';
+    filename = 'results/roFishtail_soBT_r5.mat';
     save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
 else
-    load('results/roFishtail_soBT_r25.mat')
+    load('results/roFishtail_soBT_r5.mat')
 end
 
 %% Plots.
@@ -377,7 +377,7 @@ error_soBT      = zeros(numSamples, 1);          % Error due to (intrusive, inte
 
 % Full-order simulation data.
 % recompute = false;
-recompute = true;
+recompute = false;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
@@ -442,7 +442,7 @@ if plotResponse
     loglog(s_hz, resp_soBT, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
     leg = legend('Full-order', 'soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
-    xlim([imag(s(1)), imag(s(end))])
+    xlim([(s_hz(1)), (s_hz(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
     xlabel('s [Hz]', 'fontsize', fs, 'interpreter', 'latex')
     ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
@@ -450,12 +450,12 @@ if plotResponse
     % Relative errors
     subplot(2,1,2)
     loglog(s_hz, error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
-    loglog(s_hz, error_foQuadBT, '-*', 'linewidth', 2, 'color', ColMat(3,:));
+    loglog(s_hz, error_foQuadBT,  '-*', 'linewidth', 2, 'color', ColMat(3,:));
     loglog(s_hz, error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-    loglog(s_hz, error_soBT, '-*', 'linewidth', 2, 'color', ColMat(5,:));
+    loglog(s_hz, error_soBT,      '-*', 'linewidth', 2, 'color', ColMat(5,:));
     leg = legend('soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
-    xlim([imag(s(1)), imag(s(end))])
+    xlim([(s_hz(1)), (s_hz(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
     xlabel('s [Hz]', 'fontsize', fs, 'interpreter', 'latex')
     ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
@@ -467,10 +467,10 @@ write = true;
 if write
     magMatrix = [s_hz', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
         resp_soBT];
-    dlmwrite('results/FishtailReducedOrderResponse_r25_N200.dat', magMatrix, ...
+    dlmwrite('results/FishtailReducedOrderResponse_r5_N200.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
     errorMatrix = [s_hz', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
-    dlmwrite('results/FishtailReducedOrderError_r25_N200.dat', errorMatrix, ...
+    dlmwrite('results/FishtailReducedOrderError_r5_N200.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
 

@@ -55,7 +55,7 @@ alpha = 0;
 beta  = 1e-6;
 
 %% Reduced order models.
-% Test performance from i[1e2, 1e8].
+% Test performance from i[1e3, 1e6].
 a = 3;  b = 6;  nNodes = 200;          
 
 % Prepare quadrature weights and nodes according to Trapezoidal rule.
@@ -66,8 +66,8 @@ a = 3;  b = 6;  nNodes = 200;
 r = 10;
 
 % Transfer function data.
-recomputeSamples = true;
-% recomputeSamples = false;
+% recomputeSamples = true;
+recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -147,17 +147,22 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-[Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
-% Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Mr_soQuadBT  = eye(r, r);
-Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Dr_soQuadBT  = alpha*Mr_soQuadBT + beta*Kr_soQuadBT;
-Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
-
-filename = 'results/roButterfly_soQuadBT_r10_N200.mat';
-save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
+recomputeModel = false;
+if recomputeModel
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
+    % Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Mr_soQuadBT  = eye(r, r);
+    Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT  = alpha*Mr_soQuadBT + beta*Kr_soQuadBT;
+    Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+    
+    filename = 'results/roButterfly_soQuadBT_r10_N200.mat';
+    save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
+else
+    load('results/roButterfly_soQuadBT_r10_N200.mat')
+end
 
 %% 2. soLoewner.
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE (soLoewner).\n')
@@ -210,21 +215,25 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-% Relevant SVDs.
-[Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
-[~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
-
-% Compress.
-Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
-Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
-Dr_soLoewner  = alpha*Mr_soLoewner + beta*Kr_soLoewner;
-Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
-Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
-
-filename = 'results/roButterfly_soLoewner_r10_N200.mat';
-save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
-
+recomputeModel = false;
+if recomputeModel
+    % Reductor.
+    % Relevant SVDs.
+    [Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
+    [~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
+    
+    % Compress.
+    Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
+    Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
+    Dr_soLoewner  = alpha*Mr_soLoewner + beta*Kr_soLoewner;
+    Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
+    Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
+    
+    filename = 'results/roButterfly_soLoewner_r10_N200.mat';
+    save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
+else
+    load('results/roButterfly_soLoewner_r10_N200.mat')
+end
 %% 3. foQuadBT.
 fprintf(1, 'BUILDING LOEWNER QUADRUPLE (foQuadBT).\n')
 fprintf(1, '--------------------------------------\n')
@@ -290,42 +299,54 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-% Reductor.
-[Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
-Er_foQuadBT  = eye(r, r);
-Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
-Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
-Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
+recomputeModel = false;
+if recomputeModel
+    % Reductor.
+    [Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
+    Er_foQuadBT  = eye(r, r);
+    Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
+    Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
+    Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
+    
+    filename = 'results/roButterfly_foQuadBT_r10_N200.mat';
+    save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
 
-filename = 'results/roButterfly_foQuadBT_r10_N200.mat';
-save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
+else
+    load('results/roButterfly_foQuadBT_r10_N200.mat')
+end
 
 %% 4. soBT.
-soSys    = struct();
-soSys.M  = M;
-soSys.E  = D;
-soSys.K  = K;
-soSys.Bu = B;
-soSys.Cp = C;
-soSys.Cv = zeros(p, n);
-soSys.D  = zeros(p, m);
 
-% Input opts.
-opts                  = struct();
-opts.BalanceType      = 'pv';
-opts.Order            = r;
-opts.OrderComputation = 'order';
-opts.OutputModel      = 'so';
-
-[soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
-Mr_soBT = soBTRom_Rayleigh.M;
-Dr_soBT = soBTRom_Rayleigh.E;
-Kr_soBT = soBTRom_Rayleigh.K;
-Br_soBT = soBTRom_Rayleigh.Bu;
-Cpr_soBT = soBTRom_Rayleigh.Cp;
-
-filename = 'results/roButterfly_soBT_r10.mat';
-save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
+recomputeModel = false;
+if recomputeModel
+    soSys    = struct();
+    soSys.M  = M;
+    soSys.E  = D;
+    soSys.K  = K;
+    soSys.Bu = B;
+    soSys.Cp = C;
+    soSys.Cv = zeros(p, n);
+    soSys.D  = zeros(p, m);
+    
+    % Input opts.
+    opts                  = struct();
+    opts.BalanceType      = 'pv';
+    opts.Order            = r;
+    opts.OrderComputation = 'order';
+    opts.OutputModel      = 'so';
+    
+    [soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
+    Mr_soBT = soBTRom_Rayleigh.M;
+    Dr_soBT = soBTRom_Rayleigh.E;
+    Kr_soBT = soBTRom_Rayleigh.K;
+    Br_soBT = soBTRom_Rayleigh.Bu;
+    Cpr_soBT = soBTRom_Rayleigh.Cp;
+    
+    filename = 'results/roButterfly_soBT_r10.mat';
+    save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
+else
+    load('results/roButterfly_soBT_r10.mat')
+end
 
 %% Plots.
 numSamples      = 500;
@@ -340,8 +361,8 @@ resp_soBT       = zeros(numSamples, 1);          % Response of (intrusive, inter
 error_soBT      = zeros(numSamples, 1);          % Error due to (intrusive, intermediate reduction) soBT reduced model
 
 % Full-order simulation data.
-% recompute = false;
-recompute = true;
+recompute = false;
+% recompute = true;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
@@ -382,8 +403,8 @@ for ii=1:numSamples
     fprintf(1, '----------------------------------------------------------------------\n');
 end
 
-% plotResponse = true;
-plotResponse = false;
+plotResponse = true;
+% plotResponse = false;
 if plotResponse
     % Plot colors
     ColMat      = zeros(6,3);
@@ -429,11 +450,11 @@ end
 % Store data.
 write = true;
 if write
-    magMatrix = [s', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
+    magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
         resp_soBT];
     dlmwrite('results/ButterflyReducedOrderResponse_r10_N200.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
-    errorMatrix = [s', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
+    errorMatrix = [imag(s)', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
     dlmwrite('results/ButterflyReducedOrderError_r10_N200.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
