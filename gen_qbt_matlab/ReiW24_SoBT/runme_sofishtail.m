@@ -164,7 +164,7 @@ end
 recomputeModel = true;
 if recomputeModel
     % Reductor.
-    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
     % Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Mr_soQuadBT  = eye(r, r);
     Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
@@ -331,7 +331,7 @@ else
 end
 
 %% 4. soBT.
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     soSys    = struct();
     soSys.M  = M;
@@ -364,62 +364,100 @@ end
 
 %% Plots.
 numSamples      = 500;
-s               = 1i*(2*pi)*logspace(-1, 4, numSamples);
+s               = 1i*(2*pi)*logspace(-4, 4, numSamples);
 s_hz            = imag(s)/2/pi;
-resp_soQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) soQuadBT reduced model
-error_soQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) soQuadBT reduced model
-resp_soLoewner  = zeros(numSamples, 1);          % Response of (non-intrusive) soLoewner reduced model
-error_soLoewner = zeros(numSamples, 1);          % Error due to (non-intrusive) soLoewner reduced model
-resp_foQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) foQuadBT reduced model
-error_foQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) foQuadBT reduced model
-resp_soBT       = zeros(numSamples, 1);          % Response of (intrusive, intermediate reduction) soBT reduced model
-error_soBT      = zeros(numSamples, 1);          % Error due to (intrusive, intermediate reduction) soBT reduced model
+
+% Transfer function evaluations.
+Gr_soQuadBT  = zeros(p, m, numSamples);
+Gr_soLoewner = zeros(p, m, numSamples);
+Gr_foQuadBT  = zeros(p, m, numSamples);
+Gr_soBT      = zeros(p, m, numSamples);
+
+% Magnitude response and errors.
+resp_soQuadBT          = zeros(numSamples, 1); % Response of (non-intrusive) soQuadBT reduced model
+relSVError_soQuadBT    = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) soQuadBT reduced model
+absSVError_soQuadBT    = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) soQuadBT reduced model
+% relFrobError_soQuadBT  = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
+absFrobError_soQuadBT  = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
+
+resp_soLoewner         = zeros(numSamples, 1); % Response of (non-intrusive) soLoewner reduced model
+relSVError_soLoewner   = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) soLoewner reduced model
+absSVError_soLoewner   = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) soLoewner reduced model
+% relFrobError_soLoewner = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
+absFrobError_soLoewner = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
+
+resp_foQuadBT          = zeros(numSamples, 1); % Response of (non-intrusive) foQuadBT reduced model
+relSVError_foQuadBT    = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) foQuadBT reduced model
+absSVError_foQuadBT    = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) foQuadBT reduced model
+% relFrobError_foQuadBT  = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
+absFrobError_foQuadBT  = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
+
+resp_soBT              = zeros(numSamples, 1); % Response of (intrusive, intermediate reduction) soBT reduced model
+relSVError_soBT        = zeros(numSamples, 1); % Rel. SV error due to (intrusive, intermediate reduction) soBT reduced model
+absSVError_soBT        = zeros(numSamples, 1); % Abs. SV error due to (intrusive, intermediate reduction) soBT reduced model
+% relFrobError_soBT      = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
+absFrobError_soBT      = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
+
 
 % Full-order simulation data.
+recompute = true;
 % recompute = false;
-recompute = false;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
+    GfoFrob = zeros(numSamples, 1);
     fprintf(1, 'Sampling full-order transfer function along i[1e2, 1e7].\n')
     fprintf(1, '--------------------------------------------------------\n')
     for ii = 1:numSamples
         timeSolve = tic;
         fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, s(ii))
         Gfo(:, :, ii) = C*((s(ii)^2*M +s(ii)*D + K)\B);
-        GfoResp(ii)   = norm(Gfo(:, :, ii), 2);
+        GfoResp(ii)   = max(svd(Gfo(:, :, ii)));
+        GfoFrob(ii)   = norm(Gfo(:, :, ii), 'fro');     % Matrix Frobenius-norm
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
-    save('results/FishtailFullOrderSimData_1e-1to1e4Hz.mat', 'Gfo', 'GfoResp')
+    save('results/FishtailFullOrderSimData_1e-4to1e4Hz.mat', 'Gfo', 'GfoResp')
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
-    load('results/FishtailFullOrderSimData_1e-1to1e4Hz.mat')
+    load('results/FishtailFullOrderSimData_1e-4to1e4Hz.mat')
 end
 
 % Compute frequency response along imaginary axis.
 for ii=1:numSamples
     fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, real(s(ii)))
     % Transfer functions.
-    Gr_soQuadBT         = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT + Kr_soQuadBT)\Br_soQuadBT);
-    Gr_foQuadBT         = Cr_foQuadBT*((s(ii)*Er_foQuadBT + Ar_foQuadBT)\Br_foQuadBT);
-    Gr_soLoewner        = Cpr_soLoewner*((s(ii)^2*Mr_soLoewner + s(ii)*Dr_soLoewner + Kr_soLoewner)\Br_soLoewner);
-    Gr_soBT             = Cpr_soBT*((s(ii)^2*Mr_soBT + s(ii)*Dr_soBT + Kr_soBT)\Br_soBT);
+    Gr_soQuadBT(:, :, ii)    = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT + Kr_soQuadBT)\Br_soQuadBT);
+    Gr_foQuadBT(:, :, ii)    = Cr_foQuadBT*((s(ii)*Er_foQuadBT + Ar_foQuadBT)\Br_foQuadBT);
+    Gr_soLoewner(:, :, ii)   = Cpr_soLoewner*((s(ii)^2*Mr_soLoewner + s(ii)*Dr_soLoewner + Kr_soLoewner)\Br_soLoewner);
+    Gr_soBT(:, :, ii)        = Cpr_soBT*((s(ii)^2*Mr_soBT + s(ii)*Dr_soBT + Kr_soBT)\Br_soBT);
 
     % Response and errors. 
-    resp_soQuadBT(ii)   = norm(Gr_soQuadBT, 2); 
-    error_soQuadBT(ii)  = norm(Gfo(:, :, ii) - Gr_soQuadBT, 2)/GfoResp(ii);
-    resp_foQuadBT(ii)   = norm(Gr_foQuadBT, 2); 
-    error_foQuadBT(ii)  = norm(Gfo(:, :, ii) - Gr_foQuadBT, 2)/GfoResp(ii); 
-    resp_soLoewner(ii)  = norm(Gr_soLoewner, 2); 
-    error_soLoewner(ii) = norm(Gfo(:, :, ii) - Gr_soLoewner, 2)/GfoResp(ii); 
-    resp_soBT(ii)       = norm(Gr_soBT, 2); 
-    error_soBT(ii)      = norm(Gfo(:, :, ii) - Gr_soBT, 2)/GfoResp(ii); 
+    resp_soQuadBT(ii)          = norm(Gr_soQuadBT(:, :, ii), 2); 
+    absSVError_soQuadBT(ii)    = max(svd(Gfo(:, :, ii) - Gr_soQuadBT(:, :, ii)));
+    relSVError_soQuadBT(ii)    = absSVError_soQuadBT(ii)/GfoResp(ii);
+    absFrobError_soQuadBT(ii)  = norm((Gfo(:, :, ii) - Gr_soQuadBT(:, :, ii)), 'fro');
+
+    resp_foQuadBT(ii)          = norm(Gr_foQuadBT(:, :, ii), 2); 
+    absSVError_foQuadBT(ii)    = max(svd(Gfo(:, :, ii) - Gr_foQuadBT(:, :, ii))); 
+    relSVError_foQuadBT(ii)    = absSVError_foQuadBT(ii)/GfoResp(ii); 
+    absFrobError_foQuadBT(ii)  = norm((Gfo(:, :, ii) - Gr_foQuadBT(:, :, ii)), 'fro');
+
+    resp_soLoewner(ii)         = norm(Gr_soLoewner(:, :, ii), 2); 
+    absSVError_soLoewner(ii )  = max(svd(Gfo(:, :, ii) - Gr_soLoewner(:, :, ii)));
+    relSVError_soLoewner(ii)   = absSVError_soLoewner(ii)/GfoResp(ii); 
+    absFrobError_soLoewner(ii) = norm((Gfo(:, :, ii) - Gr_soLoewner(:, :, ii)), 'fro');
+
+    resp_soBT(ii)              = norm(Gr_soBT(:, :, ii), 2); 
+    absSVError_soBT(ii)        = max(svd(Gfo(:, :, ii) - Gr_soBT(:, :, ii)));
+    relSVError_soBT(ii)        = absSVError_soBT(ii)/GfoResp(ii); 
+    absFrobError_soBT(ii)      = norm((Gfo(:, :, ii) - Gr_soBT(:, :, ii)), 'fro');
+
     fprintf(1, '----------------------------------------------------------------------\n');
 end
 
-% plotResponse = true;
-plotResponse = false;
+plotResponse = true;
+% plotResponse = false;
 if plotResponse
     % Plot colors
     ColMat      = zeros(6,3);
@@ -449,10 +487,10 @@ if plotResponse
     
     % Relative errors
     subplot(2,1,2)
-    loglog(s_hz, error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
-    loglog(s_hz, error_foQuadBT,  '-*', 'linewidth', 2, 'color', ColMat(3,:));
-    loglog(s_hz, error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-    loglog(s_hz, error_soBT,      '-*', 'linewidth', 2, 'color', ColMat(5,:));
+    loglog(s_hz, relSVError_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    loglog(s_hz, relSVError_foQuadBT,  '-*', 'linewidth', 2, 'color', ColMat(3,:));
+    loglog(s_hz, relSVError_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
+    loglog(s_hz, relSVError_soBT,      '-*', 'linewidth', 2, 'color', ColMat(5,:));
     leg = legend('soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
         'interpreter', 'latex');
     xlim([(s_hz(1)), (s_hz(end))])
@@ -469,10 +507,27 @@ if write
         resp_soBT];
     dlmwrite('results/FishtailReducedOrderResponse_r5_N200.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
-    errorMatrix = [s_hz', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
+    errorMatrix = [s_hz', relSVError_soQuadBT, relSVError_foQuadBT, relSVError_soLoewner, relSVError_soBT];
     dlmwrite('results/FishtailReducedOrderError_r5_N200.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
+
+
+%% Error measures.
+% Print errors.
+fprintf(1, 'Order r = %d.\n', r)
+fprintf(1, '--------------\n')
+fprintf(1, 'Relative H-infty error due to soQuadBT : %.16f \n', max((absSVError_soQuadBT))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to soLoewner: %.16f \n', max((absSVError_soLoewner))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to foLoewner: %.16f \n', max((absSVError_foQuadBT))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to soBT     : %.16f \n', max((absSVError_soBT))./max((GfoResp)))
+fprintf(1, '------------------------------------------------------------\n')
+fprintf(1, 'Relative H-2 error due to soQuadBT : %.16f \n', sum(absFrobError_soQuadBT)/sum(GfoFrob))
+fprintf(1, 'Relative H-2 error due to soLoewner: %.16f \n', sum(absFrobError_soLoewner)/sum(GfoFrob))
+fprintf(1, 'Relative H-2 error due to foLoewner: %.16f \n', sum(absFrobError_foQuadBT)/sum(GfoFrob))
+fprintf(1, 'Relative H-2 error due to soBT     : %.16f \n', sum(absFrobError_soBT)/sum(GfoFrob))
+fprintf(1, '------------------------------------------------------------\n')
+
 
 %% Finished script.
 fprintf(1, 'FINISHED SCRIPT.\n');
