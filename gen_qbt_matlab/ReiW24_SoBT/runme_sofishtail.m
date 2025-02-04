@@ -377,25 +377,21 @@ Gr_soBT      = zeros(p, m, numSamples);
 resp_soQuadBT          = zeros(numSamples, 1); % Response of (non-intrusive) soQuadBT reduced model
 relSVError_soQuadBT    = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) soQuadBT reduced model
 absSVError_soQuadBT    = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) soQuadBT reduced model
-% relFrobError_soQuadBT  = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
 absFrobError_soQuadBT  = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
 
 resp_soLoewner         = zeros(numSamples, 1); % Response of (non-intrusive) soLoewner reduced model
 relSVError_soLoewner   = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) soLoewner reduced model
 absSVError_soLoewner   = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) soLoewner reduced model
-% relFrobError_soLoewner = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
 absFrobError_soLoewner = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
 
 resp_foQuadBT          = zeros(numSamples, 1); % Response of (non-intrusive) foQuadBT reduced model
 relSVError_foQuadBT    = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) foQuadBT reduced model
 absSVError_foQuadBT    = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) foQuadBT reduced model
-% relFrobError_foQuadBT  = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
 absFrobError_foQuadBT  = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
 
 resp_soBT              = zeros(numSamples, 1); % Response of (intrusive, intermediate reduction) soBT reduced model
 relSVError_soBT        = zeros(numSamples, 1); % Rel. SV error due to (intrusive, intermediate reduction) soBT reduced model
 absSVError_soBT        = zeros(numSamples, 1); % Abs. SV error due to (intrusive, intermediate reduction) soBT reduced model
-% relFrobError_soBT      = zeros(numSamples, 1); % Rel. Frob. error due to (non-intrusive) soQuadBT reduced model
 absFrobError_soBT      = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
 
 
@@ -416,7 +412,7 @@ if recompute
         GfoFrob(ii)   = norm(Gfo(:, :, ii), 'fro');     % Matrix Frobenius-norm
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
-    save('results/FishtailFullOrderSimData_1e-4to1e4Hz.mat', 'Gfo', 'GfoResp')
+    save('results/FishtailFullOrderSimData_1e-4to1e4Hz.mat', 'Gfo', 'GfoResp', 'GfoFrob')
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
