@@ -81,10 +81,11 @@ else
 end
 
 % Compute weights according to the exponential trapezoidal rule.
-weightsRight = [nodesRight(2) - nodesRight(1); nodesRight(3:end) - nodesRight(2:end-1); ...
+weightsRight = [nodesRight(2) - nodesRight(1); nodesRight(3:end) - nodesRight(1:end-2); ...
     nodesRight(end) - nodesRight(end-1)]./2;
-weightsRight = sqrt(1 / (2 * pi)) * sqrt(abs(weightsRight));   
-weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(2:end-1); ...
+weightsRight = sqrt(1/(2*pi))*sqrt(abs(weightsRight));   
+weightsLeft  = [nodesLeft(2) - nodesLeft(1); nodesLeft(3:end) - nodesLeft(1:end-2); ...
     nodesLeft(end) - nodesLeft(end-1)]./2; 
-weightsLeft  = sqrt(1 / (2 * pi)) * sqrt(abs(weightsLeft)); 
+weightsLeft  = sqrt(1/(2*pi))*sqrt(abs(weightsLeft)); 
+
 end

@@ -78,7 +78,7 @@ ABAR = zeros(nLeft*p, nRight*m);
 BBAR = zeros(nLeft*p, m);
 CBAR = zeros(p,       nRight*m);
 
-% Calculation of HBAR, GBAR.
+% Calculation of BBAR, CBAR.
 for k = 1:nLeft
     BBAR((k - 1)*p + 1:k*p, :) = leftWeights(k)*leftSamples(:, :, k); 
 end
@@ -86,16 +86,16 @@ for j = 1:nRight
     CBAR(:, (j - 1)*m + 1:j*m) = rightWeights(j)*rightSamples(:, :, j);  
 end
 
-% Block entrywise calculation of LBAR, MBAR.
+% Block entrywise calculation of EBAR, ABAR.
 for k = 1:nLeft
     for j = 1:nRight
         tmpDenom = leftPoints(k) - rightPoints(j);
-        % For LBAR.
+        % For EBAR.
         EBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -leftWeights(k)*rightWeights(j) ...
             *(leftSamples(:, :, k) - rightSamples(:, :, j))./tmpDenom;
 
-        % For MBAR.
-        ABAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = leftWeights(k)*rightWeights(j) ...
+        % For ABAR.
+        ABAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -leftWeights(k)*rightWeights(j) ...
             *(leftPoints(k)*leftSamples(:, :, k) - rightPoints(j)*rightSamples(:, :, j))./tmpDenom;
     end
 end

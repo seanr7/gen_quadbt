@@ -1,25 +1,28 @@
 function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightPoints, ...
                                                              leftWeights, rightWeights, ...
                                                              leftData,    rightData, ...
-                                                             damping,     DParam)
+                                                             damping,     DParam, ...
+                                                             output)
 %LOEWNER_FACTORY Factory function for (second-order) Loewner matrix 
 % quintuples.
 %
 % SYNTAX:
-%   [MBAR, DBAR, KBAR, BBAR, CBAR] = loewner_factory(leftPoints,  rightPoints, ...
-%                                                    leftWeights, rightWeights, ...
-%                                                    leftData,    rightData, ...
-%                                                    damping,     DParam)
+%   [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightPoints, ...
+%                                                       leftWeights, rightWeights, ...
+%                                                       leftData,    rightData, ...
+%                                                       damping,     DParam
+%                                                       output)
+%
 %
 % DESCRIPTION:
 %   This is a factory function to compute Loewner matrix quintuples
 %   (MBAR, DBAR, KBAR, BBAR, CBAR) for use in second-order (so)
 %   quadrature-based balanced truncation. 
 %   Formula for the Loewner matrices depend on the damping model;
-%   see [Reiter and Werner, 2024].
+%   see the companion paper [Reiter and Werner, 2025].
 %
-%   To compute matrices for the second-order Loewner framework presents in
-%   "Data-Driven Identification of Rayleigh-Damped Second-Order Systems" 
+%   To compute matrices for the so Loewner framework proposed in
+%   "Data-driven identification of Rayleigh-damped second-order systems" 
 %   [Pontes, Goyal, and Benner 2022], set leftWeights and rightWeights to
 %   be vectors of all ones.
 %
@@ -43,29 +46,33 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightP
 %                       DParam = [alpha; beta] where D = alpha*M + beta*K
 %                  if strcmp(damping, 'Structural')
 %                       DParam = eta, material damping coefficient
+%   output       - type of output ('Position' or 'Velocity')
+%                       (default) output = 'Position'
 %
 % OUTPUTS: 
-%   MBAR  - nLeft*p x nRight*m diagonally scaled Loewner matrix; 
+%   MBAR - nLeft*p x nRight*m diagonally scaled Loewner matrix; 
 %          corresponds to mass matrix M in so system realization 
-%   DBAR  - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
+%   DBAR - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
 %          corresponds to damping matrix D in so system realization 
-%   KBAR  - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
+%   KBAR - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
 %          corresponds to stiffness matrix K in so system realization 
-%   BBAR  - nLeft*p x m matrix of left data; in (3) corresponds to input 
+%   BBAR - nLeft*p x m matrix of left data; in (3) corresponds to input 
 %          matrix B in so system realization
-%   CBAR  - p x nRight*m matrix of right data in (4); corresponds to 
-%          (position) output matrix C in so system realization
+%   CBAR - p x nRight*m matrix of right data in (4); corresponds to 
+%          (position or velocity) output matrix Cp or Cv in so system 
+%          realization
 % 
 
 %
 % This file is part of the archive Code and Results for Numerical 
-% Experiments in "..."
-% Copyright (c) 2024 Sean Reiter, Steffen W. R. Werner
+% Experiments in "Data-driven balanced truncation for second-order systems
+% with generalized proportional damping"
+% Copyright (c) 2025 Sean Reiter, Steffen W. R. Werner
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)
 %
 % Virginia Tech, USA
-% Last editied: 8/12/2024
+% Last editied: 5/28/2025
 %
 
 %%
@@ -81,6 +88,8 @@ nRight = length(rightPoints);
 % Assertions.
 assert(strcmp(damping, 'Rayleigh') || strcmp(damping, 'Structural'), ...
     'Inputted damping model not supported!')
+assert(strcmp(output, 'Position') || strcmp(output, 'Velocity'), ...
+    'Unrecognized argument for output!')
 
 if strcmp(damping, 'Rayleigh')
     % Rayleigh damping coefficients.
@@ -109,20 +118,25 @@ for k = 1:nLeft
     BBAR((k - 1)*p + 1:k*p, :) = leftWeights(k)*leftData(:, :, k); 
 end
 for j = 1:nRight
-    CBAR(:, (j - 1)*m + 1:j*m) = rightWeights(j)*rightData(:, :, j);  
+    if strcmp(output, 'Position')
+        CBAR(:, (j - 1)*m + 1:j*m) = rightWeights(j)*rightData(:, :, j);  
+    else
+        % If a velocity output, need to adjust the data.
+        CBAR(:, (j - 1)*m + 1:j*m) = (rightWeights(j)/rightPoints(j))*rightData(:, :, j);
+    end
 end
 
 % Outside of the scalar function evaluations n(s), d(s), and f(s), the 
-% construction of LBAR_M and LBAR_K proceed identically for 'Rayleigh' and
+% construction of MBAR and KBAR proceed identically for 'Rayleigh' and
 % 'Structural' damping.
 
 % Compute additional function evaluations arising in Loewner 
 % construction (scalar functions, so quick).
-denomLeft  = zeros(nLeft, 1);
+denomLeft  = zeros(nLeft,  1);
 denomRight = zeros(nRight, 1);
-numLeft    = zeros(nLeft, 1);
+numLeft    = zeros(nLeft,  1);
 numRight   = zeros(nRight, 1);
-fracLeft   = zeros(nLeft, 1);
+fracLeft   = zeros(nLeft,  1);
 fracRight  = zeros(nRight, 1);
 
 % Rayleigh damping.
@@ -160,13 +174,26 @@ end
 for k = 1:nLeft
     for j = 1:nRight
         tmpDenom = fracLeft(k) - fracRight(j);
-        % For LBAR_M.
-        MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -leftWeights(k)*rightWeights(j) ...
-            *((1/denomRight(j))*leftData(:, :, k) - (1/denomLeft(k))*rightData(:, :, j))./tmpDenom;
+        tmpMult  = ((leftWeights(k)*rightWeights(j))/(denomLeft(k)*denomRight(j)));
+        % If velocity output, only, some data needs to be rescaled.
+        if strcmp(output, 'Velocity')
+            % For MBAR.
+            MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -tmpMult*(denomLeft(k)*leftData(:, :, k) ...
+                - denomRight(j)*(leftPoints(k)/rightPoints(j))*rightData(:, :, j))./tmpDenom;
 
-        % For LBAR_K.
-        KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = leftWeights(k)*rightWeights(j) ...
-            *((fracLeft(k)/denomRight(j))*leftData(:, :, k) - (fracRight(j)/denomLeft(k))*rightData(:, :, j))./tmpDenom;
+            % For KBAR.
+            KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = tmpMult*(numLeft(k)*leftData(:, :, k) ...
+                - numRight(j)*(leftPoints(k)/rightPoints(j))*rightData(:, :, j))./tmpDenom;
+        else
+            % Position output, only.
+            % For MBAR.
+            MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -tmpMult*(denomLeft(k)*leftData(:, :, k) ...
+                - denomRight(j)*rightData(:, :, j))./tmpDenom;
+    
+            % For KBAR.
+            KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = tmpMult*(numLeft(k)*leftData(:, :, k) ...
+                - numRight(j)*rightData(:, :, j))./tmpDenom;
+        end
     end
 end
 

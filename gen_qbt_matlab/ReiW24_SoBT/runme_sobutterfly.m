@@ -5,8 +5,9 @@
 
 %
 % This file is part of the archive Code, Data, and Results for Numerical 
-% Experiments in "..."
-% Copyright (c) 2024 Sean Reiter,
+% Experiments in "Data-driven balanced truncation for second-order 
+% systems with generalized proportional damping"
+% Copyright (c) 2025 Sean Reiter, Steffen W. R. Werner
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)
 %
@@ -41,7 +42,7 @@ fprintf(1, '\n');
 
 
 %% Problem data.
-fprintf(1, 'Loading butterfly gyroscope benchmark problem.\n')
+fprintf(1, 'Loading butterfly gyroscope.\n')
 fprintf(1, '----------------------------------------------\n')
 
 % From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Butterfly_Gyroscope
@@ -54,19 +55,28 @@ load('data/Butterfly.mat')
 alpha = 0;
 beta  = 1e-6;
 
+%% Part 1.
+% Assume true damping coefficients are known.
+
 %% Reduced order models.
-% Test performance from i[1e3, 1e6].
-a = 3;  b = 6;  nNodes = 200;          
+% Test performance from i[1e4, 1e6].
+a = 4;  b = 6;  nNodes = 200;          
 
 % Prepare quadrature weights and nodes according to Trapezoidal rule.
 [nodesLeft, weightsLeft, nodesRight, weightsRight] = trapezoidal_rule([a, b], ...
     nNodes, true);
 
+% Put into complex conjugate pairs to make reduced-order model matrices
+% real valued. 
+[nodesLeft, Ileft]   = sort(nodesLeft, 'ascend');    
+[nodesRight, Iright] = sort(nodesRight, 'ascend');   
+weightsLeft          = weightsLeft(Ileft);
+weightsRight         = weightsRight(Iright);
+
 % Order of reduction.
 r = 10;
 
 % Transfer function data.
-% recomputeSamples = true;
 recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
@@ -85,240 +95,168 @@ if recomputeSamples
         fprintf(1, 'Solves finished in %.2f s.\n',toc)
         fprintf(1, '-----------------------------\n');
     end
-    save('results/Butterfly_Samples_1e3to1e6.mat', 'GsLeft', 'GsRight', ...
+    save('results/Butterfly_Samples_N200_1e4to1e6.mat', 'GsLeft', 'GsRight', ...
         'nodesLeft', 'nodesRight')
 else
     fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
     fprintf(1, '-------------------------------------------\n')
-    load('results/Butterfly_Samples_1e3to1e6.mat', 'GsLeft', 'GsRight')
+    load('results/butterfly_samples_N200_1e4to1e6.mat', 'GsLeft', 'GsRight')
 end
 
 % Non-intrusive methods.
 %% 1. soQuadBT.
-fprintf(1, 'BUILDING LOEWNER QUADRUPLE (soQuadBT).\n')
+fprintf(1, 'BUILDING LOEWNER MATRICES (soQuadBT).\n')
 fprintf(1, '--------------------------------------\n')
 timeLoewner = tic;
 
-% Loewner quadruple.
-[Mbar_soQuadBT, Dbar_soQuadBT, Kbar_soQuadBT, Bbar_soQuadBT, CpBar_soQuadBT] = ...
+% Loewner matrices.
+[Mbar_soQuadBT, ~, Kbar_soQuadBT, Bbar_soQuadBT, CpBar_soQuadBT] = ...
     so_loewner_factory(nodesLeft, nodesRight, weightsLeft, weightsRight, GsLeft, ...
-                       GsRight, 'Rayleigh', [alpha, beta]);
-fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
+                       GsRight, 'Rayleigh', [alpha, beta], 'Position');
+fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-% checkLoewner = true;
-checkLoewner = false;
-if checkLoewner
-    fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soQuadBT).\n')
-    fprintf(1, '------------------------------------------------------------------------------------------\n')
-
-    % Quadrature-based square root factors.
-    timeFactors     = tic;
-    leftObsvFactor  = zeros(n, nNodes*p);
-    rightContFactor = zeros(n, nNodes*m);
-    fprintf(1, 'COMPUTING APPROXIMATE SQUARE-ROOT FACTORS.\n')
-    fprintf(1, '------------------------------------------\n')
-    for k = 1:nNodes
-        % For (position) controllability Gramian.
-        rightContFactor(:, (k - 1)*m + 1:k*m) = weightsRight(k)*(((nodesRight(k)^2.*M ...
-            + nodesRight(k).*D + K)\B));
-
-        % For (velocity) observability Gramian.
-        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = conj(weightsLeft(k))*(((conj(nodesLeft(k))^2.*M' ...
-            + conj(nodesLeft(k)).*D' + K')\C'));
-    end
-    fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeFactors))
-    fprintf(1, '------------------------------------------\n')
-
-    fprintf('-----------------------------------------------------------------------------------\n')
-    fprintf('Check for Mbar  : Error || Mbar  - leftObsvFactor.H * M * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * M * rightContFactor - Mbar_soQuadBT, 2))
-    fprintf('Check for Dbar  : Error || Dbar  - leftObsvFactor.H * D * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * D * rightContFactor - Dbar_soQuadBT, 2))
-    fprintf('Check for Kbar  : Error || Kbar  - leftObsvFactor.H * K * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * K * rightContFactor - Kbar_soQuadBT, 2))
-    fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * B - Bbar_soQuadBT, 2))
-    fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                    ||_2: %.16f\n', ...
-        norm(C * rightContFactor - CpBar_soQuadBT, 2))
-    fprintf('-----------------------------------------------------------------------------------\n')
-else
-    fprintf(1, 'Not verifying Loewner build; moving on.\n')
-    fprintf(1, '---------------------------------------\n')
+% Make it real-valued.
+Jp = zeros(nNodes*p, nNodes*p);
+Jm = zeros(nNodes*m, nNodes*m);
+Ip = eye(p, p);
+for i = 1:nNodes/2
+    Jp(1 + 2*(i - 1)*p:2*i*p, 1 + 2*(i - 1)*p:2*i*p) = 1/sqrt(2)*[Ip, -1i*Ip; Ip, 1i*Ip];
+    Jm(1 + 2*(i - 1):2*i,   1 + 2*(i - 1):2*i)       = 1/sqrt(2)*[1,  -1i;    1,  1i];
 end
+
+Mbar_soQuadBT = Jp'*Mbar_soQuadBT*Jm; Kbar_soQuadBT  = Jp'*Kbar_soQuadBT*Jm;   
+Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);  
+Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
+Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
+Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
 
 recomputeModel = false;
 if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
     % Reductor.
-    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT]    = svd(Mbar_soQuadBT);
-    % Mr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Mbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
+
+    % Reduced model matrices.
     Mr_soQuadBT  = eye(r, r);
     Kr_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Dr_soQuadBT  = alpha*Mr_soQuadBT + beta*Kr_soQuadBT;
     Cpr_soQuadBT = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Br_soQuadBT  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
-    
-    filename = 'results/roButterfly_soQuadBT_r10_N200.mat';
+        
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
+
+    filename = 'results/roButterfly_soQuadBT_r10_N200_1e4to1e6.mat';
     save(filename, 'Mr_soQuadBT', 'Dr_soQuadBT', 'Kr_soQuadBT', 'Br_soQuadBT', 'Cpr_soQuadBT');
 else
-    load('results/roButterfly_soQuadBT_r10_N200.mat')
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    load('results/roButterfly_soQuadBT_r10_N200_1e4to1e6.mat')
 end
 
 %% 2. soLoewner.
-fprintf(1, 'BUILDING LOEWNER QUADRUPLE (soLoewner).\n')
+fprintf(1, 'BUILDING LOEWNER MATRICES (soLoewner).\n')
 fprintf(1, '---------------------------------------\n')
 timeLoewner = tic;
-[Mbar_soLoewner, Dbar_soLoewner, Kbar_soLoewner, Bbar_soLoewner, CpBar_soLoewner] = ...
+
+% Loewner matrices.
+[Mbar_soLoewner, ~, Kbar_soLoewner, Bbar_soLoewner, CpBar_soLoewner] = ...
     so_loewner_factory(nodesLeft, nodesRight, ones(nNodes, 1), ones(nNodes, 1), GsLeft, ...
-                       GsRight, 'Rayleigh', [alpha, beta]);
-fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
+                       GsRight, 'Rayleigh', [alpha, beta], 'Position');
+fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-% checkLoewner = true;
-checkLoewner = false;
-if checkLoewner
-    fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soLoewner).\n')
-    fprintf(1, '------------------------------------------------------------------------------------------\n')
-
-    % Quadrature-based square root factors.
-    timeFactors     = tic;
-    leftObsvFactor  = zeros(n, nNodes*p);
-    rightContFactor = zeros(n, nNodes*m);
-    fprintf(1, 'COMPUTING APPROXIMATE SQUARE-ROOT FACTORS.\n')
-    fprintf(1, '------------------------------------------\n')
-    for k = 1:nNodes
-        % For (position) controllability Gramian.
-        rightContFactor(:, (k - 1)*m + 1:k*m) = (((nodesRight(k)^2.*M ...
-            + nodesRight(k).*D + K)\B));
-
-        % For (velocity) observability Gramian.
-        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = (((conj(nodesLeft(k))^2.*M' ...
-            + conj(nodesLeft(k)).*D' + K')\C'));
-    end
-    fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeFactors))
-    fprintf(1, '------------------------------------------\n')
-
-    fprintf('-----------------------------------------------------------------------------------\n')
-    fprintf('Check for Mbar  : Error || Mbar  - leftObsvFactor.H * M * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * M * rightContFactor - Mbar_soLoewner, 2))
-    fprintf('Check for Dbar  : Error || Dbar  - leftObsvFactor.H * D * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * D * rightContFactor - Dbar_soLoewner, 2))
-    fprintf('Check for Kbar  : Error || Kbar  - leftObsvFactor.H * K * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * K * rightContFactor - Kbar_soLoewner, 2))
-    fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * B - Bbar_soLoewner, 2))
-    fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                   ||_2: %.16f\n', ...
-        norm(C * rightContFactor - CpBar_soLoewner, 2))
-    fprintf('-----------------------------------------------------------------------------------\n')
-else
-    fprintf(1, 'Not verifying Loewner build; moving on.\n')
-    fprintf(1, '---------------------------------------\n')
-end
+% Make real valued.
+Mbar_soLoewner = Jp'*Mbar_soLoewner*Jm; Kbar_soLoewner  = Jp'*Kbar_soLoewner*Jm;   
+Mbar_soLoewner = real(Mbar_soLoewner);  Kbar_soLoewner  = real(Kbar_soLoewner);  
+Bbar_soLoewner = Jp'*Bbar_soLoewner;    CpBar_soLoewner = CpBar_soLoewner*Jm;
+Bbar_soLoewner = real(Bbar_soLoewner);  CpBar_soLoewner = real(CpBar_soLoewner);
+Dbar_soLoewner = alpha*Mbar_soLoewner + beta*Kbar_soLoewner;
 
 recomputeModel = false;
 if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soLoewner).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
     % Reductor.
     % Relevant SVDs.
     [Yl_soLoewner, Sl_soLoewner, ~] = svd([-Mbar_soLoewner, Kbar_soLoewner], 'econ');
     [~, Sr_soLoewner, Xr_soLoewner] = svd([-Mbar_soLoewner; Kbar_soLoewner], 'econ');
     
     % Compress.
-    Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); % This needs a -?
+    Mr_soLoewner  = Yl_soLoewner(:, 1:r)'*Mbar_soLoewner*Xr_soLoewner(:, 1:r); 
     Kr_soLoewner  = Yl_soLoewner(:, 1:r)'*Kbar_soLoewner*Xr_soLoewner(:, 1:r);
     Dr_soLoewner  = alpha*Mr_soLoewner + beta*Kr_soLoewner;
     Br_soLoewner  = Yl_soLoewner(:, 1:r)'*Bbar_soLoewner;
     Cpr_soLoewner = CpBar_soLoewner*Xr_soLoewner(:, 1:r);
+
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
     
-    filename = 'results/roButterfly_soLoewner_r10_N200.mat';
+    filename = 'results/roButterfly_soLoewner_r10_N200_1e4to1e6.mat';
     save(filename, 'Mr_soLoewner', 'Dr_soLoewner', 'Kr_soLoewner', 'Br_soLoewner', 'Cpr_soLoewner');
 else
-    load('results/roButterfly_soLoewner_r10_N200.mat')
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soLoewner).\n')
+    fprintf(1, '--------------------------------------\n')
+    load('results/roButterfly_soLoewner_r10_N200_1e4to1e6.mat')
 end
+
 %% 3. foQuadBT.
-fprintf(1, 'BUILDING LOEWNER QUADRUPLE (foQuadBT).\n')
+fprintf(1, 'BUILDING LOEWNER MATRICES (foQuadBT).\n')
 fprintf(1, '--------------------------------------\n')
 timeLoewner = tic;
-% Loewner quadruple.
+% Loewner matrices.
 [Ebar_foQuadBT, Abar_foQuadBT, Bbar_foQuadBT, Cbar_foQuadBT] = fo_loewner_factory(...
     nodesLeft, nodesRight, weightsLeft, weightsRight, GsLeft, GsRight);
-fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
+fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-% checkLoewner = true;
-checkLoewner = false;
-if checkLoewner
-    fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (foQuadBT).\n')
-    fprintf(1, '------------------------------------------------------------------------------------------\n')
-
-    % Quadrature-based square root factors.
-    timeFactors     = tic;
-    leftObsvFactor  = zeros(2*n, nNodes*p);
-    rightContFactor = zeros(2*n, nNodes*m);
-    fprintf(1, 'COMPUTING APPROXIMATE SQUARE-ROOT FACTORS.\n')
-    fprintf(1, '------------------------------------------\n')
-    
-    % Lift realization for comparison.
-    Efo                   = spalloc(2*n, 2*n, nnz(M) + n); % Descriptor matrix; Efo = [I, 0: 0, M]
-    Efo(1:n, 1:n)         = speye(n);                      % (1, 1) block
-    Efo(n+1:2*n, n+1:2*n) = M;                             % (2, 2) block is (sparse) mass matrix M
-    
-    Afo                   = spalloc(2*n, 2*n, nnz(K) + nnz(D) + n); % Afo = [0, I; -K, -D]
-    Afo(1:n, n+1:2*n)     = speye(n);                               % (1, 2) block of Afo
-    Afo(n+1:2*n, 1:n)     = -K;                                     % (2, 1) block is -K
-    Afo(n+1:2*n, n+1:2*n) = -D;                                     % (2, 2) block is -D 
-    
-    Bfo             = spalloc(2*n, 1, nnz(B)); % Bfo = [0; B];
-    Bfo(n+1:2*n, :) = B; 
-
-    Cfo         = spalloc(12, 2*n, nnz(C)); % Bfo = [Cp, 0];
-    Cfo(:, 1:n) = C; 
-
-
-    for k = 1:nNodes
-        % For (position) controllability Gramian.
-        rightContFactor(:, (k - 1)*m + 1:k*m) = weightsRight(k)*(((nodesRight(k).*Efo - Afo)\Bfo));
-
-        % For (velocity) observability Gramian.
-        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = conj(weightsLeft(k))*(((conj(nodesLeft(k)).*Efo' - Afo')\Cfo'));
-    end
-    fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeFactors))
-    fprintf(1, '------------------------------------------\n')
-
-    fprintf('-----------------------------------------------------------------------------------\n')
-    fprintf('Check for Ebar : Error || Ebar  - leftObsvFactor.H * Efo * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * Efo * rightContFactor - Ebar_foQuadBT, 2))
-    fprintf('Check for Abar : Error || Abar  - leftObsvFactor.H * Afo * rightContFactor ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * Afo * rightContFactor - Abar_foQuadBT, 2))
-    fprintf('Check for Bbar : Error || Bbar  - leftObsvFactor.H * Bfo                   ||_2: %.16f\n', ...
-        norm(leftObsvFactor' * Bfo - Bbar_foQuadBT, 2))
-    fprintf('Check for Cbar : Error || Cbar - C * rightContFactor                       ||_2: %.16f\n', ...
-        norm(Cfo * rightContFactor - Cbar_foQuadBT, 2))
-    fprintf('-----------------------------------------------------------------------------------\n')
-else
-    fprintf(1, 'Not verifying Loewner build; moving on.\n')
-    fprintf(1, '---------------------------------------\n')
-end
+% Make real valued.
+Ebar_foQuadBT = Jp'*Ebar_foQuadBT*Jm; Abar_foQuadBT = Jp'*Abar_foQuadBT*Jm;   
+Ebar_foQuadBT = real(Ebar_foQuadBT);  Abar_foQuadBT = real(Abar_foQuadBT);  
+Bbar_foQuadBT = Jp'*Bbar_foQuadBT;    Cbar_foQuadBT = Cbar_foQuadBT*Jm;
+Bbar_foQuadBT = real(Bbar_foQuadBT);  Cbar_foQuadBT = real(Cbar_foQuadBT);
 
 recomputeModel = false;
 if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
     % Reductor.
     [Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
+
+    % Reduced model matrices.
     Er_foQuadBT  = eye(r, r);
     Ar_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Abar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
     Cr_foQuadBT  = Cbar_foQuadBT*(Y_foQuadBT(:, 1:r)*S_foQuadBT(1:r, 1:r)^(-1/2));
     Br_foQuadBT  = (S_foQuadBT(1:r, 1:r)^(-1/2)*Z_foQuadBT(:, 1:r)')*Bbar_foQuadBT;
+
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
     
-    filename = 'results/roButterfly_foQuadBT_r10_N200.mat';
+    filename = 'results/roButterfly_foQuadBT_r10_N200_1e4to1e6.mat';
     save(filename, 'Er_foQuadBT', 'Ar_foQuadBT', 'Br_foQuadBT', 'Cr_foQuadBT');
 
 else
-    load('results/roButterfly_foQuadBT_r10_N200.mat')
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (foQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    load('results/roButterfly_foQuadBT_r10_N200_1e4to1e6.mat')
 end
 
+% Intrusive methods.
 %% 4. soBT.
-
 recomputeModel = false;
 if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
     soSys    = struct();
     soSys.M  = M;
     soSys.E  = D;
@@ -335,76 +273,173 @@ if recomputeModel
     opts.OrderComputation = 'order';
     opts.OutputModel      = 'so';
     
-    [soBTRom_Rayleigh, info] = ml_ct_s_soss_bt(soSys, opts);
-    Mr_soBT = soBTRom_Rayleigh.M;
-    Dr_soBT = soBTRom_Rayleigh.E;
-    Kr_soBT = soBTRom_Rayleigh.K;
-    Br_soBT = soBTRom_Rayleigh.Bu;
-    Cpr_soBT = soBTRom_Rayleigh.Cp;
+    [soBTRom, info_soBT] = ml_ct_s_soss_bt(soSys, opts);
+    Mr_soBT  = soBTRom.M;
+    Dr_soBT  = soBTRom.E;
+    Kr_soBT  = soBTRom.K;
+    Br_soBT  = soBTRom.Bu;
+    Cpr_soBT = soBTRom.Cp;
+
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
     
     filename = 'results/roButterfly_soBT_r10.mat';
     save(filename, 'Mr_soBT', 'Dr_soBT', 'Kr_soBT', 'Br_soBT', 'Cpr_soBT');
 else
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soBT).\n')
+    fprintf(1, '--------------------------------------\n')
     load('results/roButterfly_soBT_r10.mat')
 end
 
+%% 5. foBt.
+recomputeModel = false;
+if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
+    % Lift realization for projection.
+    Efo                   = spalloc(2*n, 2*n, nnz(M) + n); % Descriptor matrix; Efo = [I, 0: 0, M]
+    Efo(1:n, 1:n)         = speye(n);                      % (1, 1) block
+    Efo(n+1:2*n, n+1:2*n) = M;                             % (2, 2) block is (sparse) mass matrix M
+    
+    Afo                   = spalloc(2*n, 2*n, nnz(K) + nnz(D) + n); % Afo = [0, I; -K, -D]
+    Afo(1:n, n+1:2*n)     = speye(n);                               % (1, 2) block of Afo
+    Afo(n+1:2*n, 1:n)     = -K;                                     % (2, 1) block is -K
+    Afo(n+1:2*n, n+1:2*n) = -D;                                     % (2, 2) block is -D 
+    
+    Bfo             = spalloc(2*n, 1, nnz(B)); % Bfo = [0; B];
+    Bfo(n+1:2*n, :) = B; 
+
+    Cfo         = spalloc(p, 2*n, nnz(C)); % Bfo = [Cp, 0];
+    Cfo(:, 1:n) = C; 
+
+    foSys   = struct();
+    foSys.E = Efo;
+    foSys.A = Afo;
+    foSys.B = Bfo;
+    foSys.C = Cfo;
+    foSys.D = zeros(p, m);
+    
+    % Input opts.
+    opts                  = struct();
+    opts.Order            = r;
+    opts.OrderComputation = 'order';
+    
+    [foBTRom, info_foBT] = ml_ct_s_foss_bt(foSys, opts);
+    Er_foBT         = foBTRom.E;
+    Ar_foBT         = foBTRom.A;
+    Br_foBT         = foBTRom.B;
+    Cr_foBT         = foBTRom.C;
+
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
+    
+    filename = 'results/roButterfly_foBT_r10.mat';
+    save(filename, 'Er_foBT', 'Ar_foBT', 'Br_foBT', 'Cr_foBT');
+else
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (foBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    load('results/roButterfly_foBT_r10.mat')
+end
+
 %% Plots.
-numSamples      = 500;
-s               = 1i*logspace(2, 7, numSamples);
-resp_soQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) soQuadBT reduced model
-error_soQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) soQuadBT reduced model
-resp_soLoewner  = zeros(numSamples, 1);          % Response of (non-intrusive) soLoewner reduced model
-error_soLoewner = zeros(numSamples, 1);          % Error due to (non-intrusive) soLoewner reduced model
-resp_foQuadBT   = zeros(numSamples, 1);          % Response of (non-intrusive) foQuadBT reduced model
-error_foQuadBT  = zeros(numSamples, 1);          % Error due to (non-intrusive) foQuadBT reduced model
-resp_soBT       = zeros(numSamples, 1);          % Response of (intrusive, intermediate reduction) soBT reduced model
-error_soBT      = zeros(numSamples, 1);          % Error due to (intrusive, intermediate reduction) soBT reduced model
+numSamples = 500;
+s          = 1i*logspace(4, 6, numSamples);
+
+% Transfer function evaluations.
+Gr_soQuadBT  = zeros(p, m, numSamples);
+Gr_soLoewner = zeros(p, m, numSamples);
+Gr_foQuadBT  = zeros(p, m, numSamples);
+Gr_soBT      = zeros(p, m, numSamples);
+Gr_foBT      = zeros(p, m, numSamples);
+
+% Magnitude response and errors.
+resp_soQuadBT          = zeros(numSamples, 1); % Response of (non-intrusive) soQuadBT reduced model
+relSVError_soQuadBT    = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) soQuadBT reduced model
+absSVError_soQuadBT    = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) soQuadBT reduced model
+absFrobError_soQuadBT  = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soQuadBT reduced model
+
+resp_soLoewner         = zeros(numSamples, 1); % Response of (non-intrusive) soLoewner reduced model
+relSVError_soLoewner   = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) soLoewner reduced model
+absSVError_soLoewner   = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) soLoewner reduced modell
+absFrobError_soLoewner = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) soLoewner reduced model
+
+resp_foQuadBT          = zeros(numSamples, 1); % Response of (non-intrusive) foQuadBT reduced model
+relSVError_foQuadBT    = zeros(numSamples, 1); % Rel. SV error due to (non-intrusive) foQuadBT reduced model
+absSVError_foQuadBT    = zeros(numSamples, 1); % Abs. SV error due to (non-intrusive) foQuadBT reduced model
+absFrobError_foQuadBT  = zeros(numSamples, 1); % Abs. Frob. error due to (non-intrusive) foQuadBT reduced model
+
+resp_soBT              = zeros(numSamples, 1); % Response of (intrusive) soBT reduced model
+relSVError_soBT        = zeros(numSamples, 1); % Rel. SV error due to (intrusive) soBT reduced model
+absSVError_soBT        = zeros(numSamples, 1); % Abs. SV error due to (intrusive) soBT reduced model
+absFrobError_soBT      = zeros(numSamples, 1); % Abs. Frob. error due to (intrusive) soBT reduced model
+
+resp_foBT              = zeros(numSamples, 1); % Response of (intrusive) foBT reduced model
+relSVError_foBT        = zeros(numSamples, 1); % Rel. SV error due to (intrusive) foBT reduced model
+absSVError_foBT        = zeros(numSamples, 1); % Abs. SV error due to (intrusive) foBT reduced model
+absFrobError_foBT      = zeros(numSamples, 1); % Abs. Frob. error due to (intrusive) foBT reduced model
 
 % Full-order simulation data.
 recompute = false;
-% recompute = true;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
-    fprintf(1, 'Sampling full-order transfer function along i[1e2, 1e7].\n')
+    GfoFrob = zeros(numSamples, 1);
+    fprintf(1, 'Sampling full-order transfer function along i[1e4, 1e6].\n')
     fprintf(1, '--------------------------------------------------------\n')
     for ii = 1:numSamples
         timeSolve = tic;
-        fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, s(ii))
+        fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, imag(s(ii)))
         Gfo(:, :, ii) = C*((s(ii)^2*M +s(ii)*D + K)\B);
-        GfoResp(ii)   = norm(Gfo(:, :, ii), 2);
+        GfoResp(ii)   = max(svd(Gfo(:, :, ii)));        % Matrix 2-norm
+        GfoFrob(ii)   = norm(Gfo(:, :, ii), 'fro');     % Matrix Frobenius-norm
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
-    save('results/ButterflyFullOrderSimData_1e2to1e7.mat', 'Gfo', 'GfoResp')
+    save('results/butterfly_samples_N500_1e4to1e6.mat', 'Gfo', 'GfoResp', 'GfoFrob')
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
-    load('results/ButterflyFullOrderSimData_1e2to1e7.mat')
+    load('results/butterfly_samples_N500_1e4to1e6.mat')
 end
 
 % Compute frequency response along imaginary axis.
 for ii=1:numSamples
-    fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, real(s(ii)))
     % Transfer functions.
-    Gr_soQuadBT         = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT + Kr_soQuadBT)\Br_soQuadBT);
-    Gr_foQuadBT         = Cr_foQuadBT*((s(ii)*Er_foQuadBT + Ar_foQuadBT)\Br_foQuadBT);
-    Gr_soLoewner        = Cpr_soLoewner*((s(ii)^2*Mr_soLoewner + s(ii)*Dr_soLoewner + Kr_soLoewner)\Br_soLoewner);
-    Gr_soBT             = Cpr_soBT*((s(ii)^2*Mr_soBT + s(ii)*Dr_soBT + Kr_soBT)\Br_soBT);
+    Gr_soQuadBT(:, :, ii)  = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT + Kr_soQuadBT)\Br_soQuadBT);
+    Gr_soLoewner(:, :, ii) = Cpr_soLoewner*((s(ii)^2*Mr_soLoewner + s(ii)*Dr_soLoewner + Kr_soLoewner)\Br_soLoewner);
+    Gr_foQuadBT(:, :, ii)  = Cr_foQuadBT*((s(ii)*Er_foQuadBT - Ar_foQuadBT)\Br_foQuadBT);
+    Gr_soBT(:, :, ii)      = Cpr_soBT*((s(ii)^2*Mr_soBT + s(ii)*Dr_soBT + Kr_soBT)\Br_soBT);
+    Gr_foBT(:, :, ii)      = Cr_foBT*((s(ii)*Er_foBT - Ar_foBT)\Br_foBT);
 
     % Response and errors. 
-    resp_soQuadBT(ii)   = norm(Gr_soQuadBT, 2); 
-    error_soQuadBT(ii)  = norm(Gfo(:, :, ii) - Gr_soQuadBT, 2)/GfoResp(ii);
-    resp_foQuadBT(ii)   = norm(Gr_foQuadBT, 2); 
-    error_foQuadBT(ii)  = norm(Gfo(:, :, ii) - Gr_foQuadBT, 2)/GfoResp(ii); 
-    resp_soLoewner(ii)  = norm(Gr_soLoewner, 2); 
-    error_soLoewner(ii) = norm(Gfo(:, :, ii) - Gr_soLoewner, 2)/GfoResp(ii); 
-    resp_soBT(ii)       = norm(Gr_soBT, 2); 
-    error_soBT(ii)      = norm(Gfo(:, :, ii) - Gr_soBT, 2)/GfoResp(ii); 
-    fprintf(1, '----------------------------------------------------------------------\n');
+    resp_soQuadBT(ii)          = max(svd(Gr_soQuadBT(:, :, ii))); 
+    absSVError_soQuadBT(ii)    = max(svd(Gfo(:, :, ii) - Gr_soQuadBT(:, :, ii)));
+    relSVError_soQuadBT(ii)    = absSVError_soQuadBT(ii)/GfoResp(ii);
+    absFrobError_soQuadBT(ii)  = norm((Gfo(:, :, ii) - Gr_soQuadBT(:, :, ii)), 'fro');
+
+    resp_soLoewner(ii)         = max(svd(Gr_soLoewner(:, :, ii))); 
+    absSVError_soLoewner(ii)   = max(svd(Gfo(:, :, ii) - Gr_soLoewner(:, :, ii)));
+    relSVError_soLoewner(ii)   = absSVError_soLoewner(ii)/GfoResp(ii); 
+    absFrobError_soLoewner(ii) = norm((Gfo(:, :, ii) - Gr_soLoewner(:, :, ii)), 'fro');
+
+    resp_foQuadBT(ii)          = max(svd(Gr_foQuadBT(:, :, ii))); 
+    absSVError_foQuadBT(ii)    = max(svd(Gfo(:, :, ii) - Gr_foQuadBT(:, :, ii))); 
+    relSVError_foQuadBT(ii)    = absSVError_foQuadBT(ii)/GfoResp(ii); 
+    absFrobError_foQuadBT(ii)  = norm((Gfo(:, :, ii) - Gr_foQuadBT(:, :, ii)), 'fro');
+
+    resp_soBT(ii)              = max(svd(Gr_soBT(:, :, ii))); 
+    absSVError_soBT(ii)        = max(svd(Gfo(:, :, ii) - Gr_soBT(:, :, ii)));
+    relSVError_soBT(ii)        = absSVError_soBT(ii)/GfoResp(ii); 
+    absFrobError_soBT(ii)      = norm((Gfo(:, :, ii) - Gr_soBT(:, :, ii)), 'fro');
+
+    resp_foBT(ii)              = max(svd(Gr_foBT(:, :, ii))); 
+    absSVError_foBT(ii)        = max(svd(Gfo(:, :, ii) - Gr_foBT(:, :, ii)));
+    relSVError_foBT(ii)        = absSVError_foBT(ii)/GfoResp(ii); 
+    absFrobError_foBT(ii)      = norm((Gfo(:, :, ii) - Gr_foBT(:, :, ii)), 'fro');
 end
 
 plotResponse = true;
-% plotResponse = false;
 if plotResponse
     % Plot colors
     ColMat      = zeros(6,3);
@@ -420,26 +455,202 @@ if plotResponse
     % Magnitudes
     set(gca, 'fontsize', 10)
     subplot(2,1,1)
-    loglog(imag(s), GfoResp,       '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
-    loglog(imag(s), resp_soQuadBT,  '--', 'linewidth', 2, 'color', ColMat(2,:)); 
-    loglog(imag(s), resp_foQuadBT,  '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
-    loglog(imag(s), resp_soLoewner,  '--', 'linewidth', 2, 'color', ColMat(4,:)); 
-    loglog(imag(s), resp_soBT, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
-    leg = legend('Full-order', 'soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
-        'interpreter', 'latex');
+    loglog(imag(s), GfoResp,        '-o',  'linewidth', 2, 'color', ColMat(1,:)); hold on
+    loglog(imag(s), resp_soQuadBT,  '--',  'linewidth', 2, 'color', ColMat(2,:)); 
+    loglog(imag(s), resp_soLoewner, '--',  'linewidth', 2, 'color', ColMat(3,:)); 
+    loglog(imag(s), resp_foQuadBT,  '-.',  'linewidth', 2, 'color', ColMat(4,:)); 
+    loglog(imag(s), resp_soBT,      '--.', 'linewidth', 2, 'color', ColMat(5,:)); 
+    loglog(imag(s), resp_foBT,      '-.', 'linewidth', 2, 'color',  ColMat(6,:)); 
+
+    leg = legend('Full-order', 'soQuadBT', 'soLoewner', 'foQuadBT', 'soBT', 'foBT', ...
+        'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
+    xlim([imag(s(1)), imag(s(end))])
+    set(leg, 'fontsize', 10, 'interpreter', 'latex')
+
+    xlabel('$i*\omega$',            'fontsize', fs, 'interpreter', 'latex')
+    ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
+    
+    % Relative errors
+    subplot(2,1,2)
+    loglog(imag(s), relSVError_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    loglog(imag(s), relSVError_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(3,:));
+    loglog(imag(s), relSVError_foQuadBT,  '-*', 'linewidth', 2, 'color', ColMat(4,:));
+    loglog(imag(s), relSVError_soBT,      '-*', 'linewidth', 2, 'color', ColMat(5,:));
+    loglog(imag(s), relSVError_foBT,      '-*', 'linewidth', 2, 'color', ColMat(6,:));
+
+    leg = legend('soQuadBT', 'soLoewner', 'foQuadBT', 'soBT', 'foBT', 'location', ...
+        'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
+    xlim([imag(s(1)), imag(s(end))])
+    set(leg, 'fontsize', 10, 'interpreter', 'latex')
+
+    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
+        fs, 'interpreter', 'latex')
+end
+
+% Store data.
+write = true;
+if write
+    magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_soLoewner, resp_foQuadBT, ...
+        resp_soBT, resp_foBT];
+    dlmwrite('results/butterfly_r10_N200_1e4to1e6_mag.dat', magMatrix, ...
+        'delimiter', '\t', 'precision', 8);
+    errorMatrix = [imag(s)', relSVError_soQuadBT, relSVError_soLoewner, relSVError_foQuadBT ...
+        relSVError_soBT, relSVError_foBT];
+    dlmwrite('results/butterfly_r10_N200_1e4to1e6_error.dat', errorMatrix, ...
+        'delimiter', '\t', 'precision', 8);
+end
+
+%% Error measures.
+% Print errors.
+fprintf(1, 'Order r = %d.\n', r)
+fprintf(1, '--------------\n')
+fprintf(1, 'Relative H-infty error due to soQuadBT : %.16f \n', max((absSVError_soQuadBT))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to soLoewner: %.16f \n', max((absSVError_soLoewner))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to foQuadBT : %.16f \n', max((absSVError_foQuadBT))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to soBT     : %.16f \n', max((absSVError_soBT))./max((GfoResp)))
+fprintf(1, 'Relative H-infty error due to foBT     : %.16f \n', max((absSVError_foBT))./max((GfoResp)))
+fprintf(1, '------------------------------------------------------------\n')
+fprintf(1, 'Relative H-2 error due to soQuadBT     : %.16f \n', sqrt(sum(absFrobError_soQuadBT.^2)/sum(GfoFrob.^2)))
+fprintf(1, 'Relative H-2 error due to soLoewner    : %.16f \n', sqrt(sum(absFrobError_soLoewner.^2)/sum(GfoFrob.^2)))
+fprintf(1, 'Relative H-2 error due to foQuadBT     : %.16f \n', sqrt(sum(absFrobError_foQuadBT.^2)/sum(GfoFrob.^2)))
+fprintf(1, 'Relative H-2 error due to soBT         : %.16f \n', sqrt(sum(absFrobError_soBT.^2)/sum(GfoFrob.^2)))
+fprintf(1, 'Relative H-2 error due to foBT         : %.16f \n', sqrt(sum(absFrobError_foBT.^2)/sum(GfoFrob.^2)))
+fprintf(1, '------------------------------------------------------------\n')
+
+%% Part 2.
+% Estimate damping coefficients from data.
+
+%%
+% Options for fminunc.
+options = optimoptions('fminunc', 'Display', 'iter-detailed', 'Algorithm', 'quasi-newton', ...
+    'SpecifyObjectiveGradient', true, 'OptimalityTolerance', 1e-8, 'StepTolerance', 1e-8);
+
+% Test three different pairs of initial values for optimization variables.
+alpha1 = 1e-4;    beta1  = 1e-4;
+alpha2 = 0;       beta2  = 0;
+alpha3 = 1e-1;    beta3  = 1e-1;
+
+initDampingParams1 = [alpha1, beta1];
+initDampingParams2 = [alpha2, beta2];
+initDampingParams3 = [alpha3, beta3];
+
+% Instantiate objective function to pass to solver. 
+objFunc = @(dampingParams) rayleigh_damping_obj(dampingParams, [nodesLeft; nodesRight], ...
+    [cat(3, GsLeft, GsRight)], Kr_soQuadBT, Br_soQuadBT, Cpr_soQuadBT, zeros(p, r));
+
+% Minimizer.
+optDampingParams1 = fminunc(objFunc, initDampingParams1, options);
+optDampingParams2 = fminunc(objFunc, initDampingParams2, options);
+optDampingParams3 = fminunc(objFunc, initDampingParams3, options);
+
+% Found parameters.
+optAlpha1 = optDampingParams1(1); optBeta1 = optDampingParams1(2);
+optAlpha2 = optDampingParams2(1); optBeta2 = optDampingParams2(2);
+optAlpha3 = optDampingParams3(1); optBeta3 = optDampingParams3(2);
+
+fprintf(1, 'FOUND DAMPING PARAMETERS (Initialization 1).\n')
+fprintf(1, 'optAlpha1          : %.16f\n', optAlpha1)
+fprintf(1, 'optbeta1           : %.16f\n', optBeta1)
+fprintf(1, '--------------------------------------------------------\n')
+fprintf(1, 'DIFFERENCE IN FOUND DAMPING PARAMETERS COMPARED TO TRUE (Initialization 1).\n')
+fprintf(1, '|alpha - optAlpha1|: %.16f\n', abs(alpha - optAlpha1))
+fprintf(1, '|beta  - optbeta1 |: %.16f\n', abs(beta  - optBeta1))
+fprintf(1, '--------------------------------------------------------\n')
+
+fprintf(1, 'FOUND DAMPING PARAMETERS (Initialization 2).\n')
+fprintf(1, 'optAlpha2          : %.16f\n', optAlpha2)
+fprintf(1, 'optbeta2           : %.16f\n', optBeta2)
+fprintf(1, '--------------------------------------------------------\n')
+fprintf(1, 'DIFFERENCE IN FOUND DAMPING PARAMETERS COMPARED TO TRUE (Initialization 2).\n')
+fprintf(1, '|alpha - optAlpha2|: %.16f\n', abs(alpha - optAlpha2))
+fprintf(1, '|beta  - optbeta2 |: %.16f\n', abs(beta  - optBeta2))
+fprintf(1, '--------------------------------------------------------\n')
+
+fprintf(1, 'FOUND DAMPING PARAMETERS (Initialization 3).\n')
+fprintf(1, 'optAlpha3          : %.16f\n', optAlpha3)
+fprintf(1, 'optbeta3           : %.16f\n', optBeta3)
+fprintf(1, '--------------------------------------------------------\n')
+fprintf(1, 'DIFFERENCE IN FOUND DAMPING PARAMETERS COMPARED TO TRUE (Initialization 3).\n')
+fprintf(1, '|alpha - optAlpha3|: %.16f\n', abs(alpha - optAlpha3))
+fprintf(1, '|beta  - optbeta3 |: %.16f\n', abs(beta  - optBeta3))
+fprintf(1, '--------------------------------------------------------\n')
+
+% Damping with inferred parameters. 
+Dr_soQuadBT_optParams1 = optAlpha1*Mr_soQuadBT + optBeta1*Kr_soQuadBT;
+Dr_soQuadBT_optParams2 = optAlpha2*Mr_soQuadBT + optBeta2*Kr_soQuadBT;
+Dr_soQuadBT_optParams3 = optAlpha3*Mr_soQuadBT + optBeta3*Kr_soQuadBT;
+
+%% Plot response of reduced models.
+% Transfer function evaluations.
+Gr_soQuadBT_optParams1 = zeros(p, m, numSamples);
+Gr_soQuadBT_optParams2 = zeros(p, m, numSamples);
+Gr_soQuadBT_optParams3 = zeros(p, m, numSamples);
+
+% Response and errors.
+resp_soQuadBT_optParams1       = zeros(numSamples, 1); % Response of reduced model 1
+relSVError_soQuadBT_optParams1 = zeros(numSamples, 1); % Error due to reduced model 1
+resp_soQuadBT_optParams2       = zeros(numSamples, 1); % Response of reduced model 2
+relSVError_soQuadBT_optParams2 = zeros(numSamples, 1); % Error due to reduced model 2
+resp_soQuadBT_optParams3       = zeros(numSamples, 1); % Response of reduced model 3
+relSVError_soQuadBT_optParams3 = zeros(numSamples, 1); % Error due to reduced model 3
+
+% Response of full-order and soQuadBT reduced-order already computed.
+% Compute frequency response along imaginary axis.
+for ii=1:numSamples
+    % Transfer functions.
+    Gr_soQuadBT_optParams1 = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT_optParams1 + Kr_soQuadBT)\Br_soQuadBT);
+    Gr_soQuadBT_optParams2 = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT_optParams2 + Kr_soQuadBT)\Br_soQuadBT);
+    Gr_soQuadBT_optParams3 = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT_optParams3 + Kr_soQuadBT)\Br_soQuadBT);
+
+    resp_soQuadBT_optParams1(ii) = max(svd(Gr_soQuadBT_optParams1));
+    resp_soQuadBT_optParams2(ii) = max(svd(Gr_soQuadBT_optParams2));
+    resp_soQuadBT_optParams3(ii) = max(svd(Gr_soQuadBT_optParams3));
+
+    relSVError_soQuadBT_optParams1(ii) = max(svd(Gfo(:, :, ii) - Gr_soQuadBT_optParams1))/GfoResp(ii);
+    relSVError_soQuadBT_optParams2(ii) = max(svd(Gfo(:, :, ii) - Gr_soQuadBT_optParams2))/GfoResp(ii);
+    relSVError_soQuadBT_optParams3(ii) = max(svd(Gfo(:, :, ii) - Gr_soQuadBT_optParams3))/GfoResp(ii);
+end
+
+
+plotResponse = true;
+if plotResponse
+    % Plot colors
+    ColMat      = zeros(6,3);
+    ColMat(1,:) = [0.8500    0.3250    0.0980];
+    ColMat(2,:) = [0.3010    0.7450    0.9330];
+    ColMat(3,:) = [0.9290    0.6940    0.1250];
+    ColMat(4,:) = [0.4660    0.6740    0.1880];
+    ColMat(5,:) = [0.4940    0.1840    0.5560];
+    ColMat(6,:) = [1         0.4       0.6];
+    
+    figure
+    fs = 12;
+    % Magnitudes.
+    set(gca, 'fontsize', 10)
+    subplot(2,1,1)
+    loglog(imag(s), GfoResp,                  '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
+    loglog(imag(s), resp_soQuadBT,            '--', 'linewidth', 2, 'color', ColMat(2,:)); 
+    loglog(imag(s), resp_soQuadBT_optParams1, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
+    loglog(imag(s), resp_soQuadBT_optParams2, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
+    loglog(imag(s), resp_soQuadBT_optParams3, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
+    leg = legend('Full-order', 'soQuadBT (true damping)', 'soQuadBT (optimal/computed damping 1)', ...
+         'soQuadBT (optimal/computed damping 2)',  'soQuadBT (optimal/computed damping 3)', ...
+         'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
     xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
     ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
     
-    % Relative errors
+    % Relative errors.
     subplot(2,1,2)
-    loglog(imag(s), error_soQuadBT,  '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
-    loglog(imag(s), error_foQuadBT, '-*', 'linewidth', 2, 'color', ColMat(3,:));
-    loglog(imag(s), error_soLoewner, '-*', 'linewidth', 2, 'color', ColMat(4,:));
-    loglog(imag(s), error_soBT, '-*', 'linewidth', 2, 'color', ColMat(5,:));
-    leg = legend('soQuadBT', 'foQuadBT', 'soLoewner', 'soBT', 'location', 'southeast', 'orientation', 'horizontal', ...
-        'interpreter', 'latex');
+    loglog(imag(s), relSVError_soQuadBT,            '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    loglog(imag(s), relSVError_soQuadBT_optParams1, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
+    loglog(imag(s), relSVError_soQuadBT_optParams2, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
+    loglog(imag(s), relSVError_soQuadBT_optParams3, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
+    eg = legend('soQuadBT (true damping)', 'soQuadBT (optimal/computed damping 1)', ...
+         'soQuadBT (optimal/computed damping 2)',  'soQuadBT (optimal/computed damping 3)', ...
+         'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
     xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
@@ -450,14 +661,16 @@ end
 % Store data.
 write = true;
 if write
-    magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_foQuadBT, resp_soLoewner, ...
-        resp_soBT];
-    dlmwrite('results/ButterflyReducedOrderResponse_r10_N200.dat', magMatrix, ...
+    magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_soQuadBT_optParams1, ...
+        resp_soQuadBT_optParams2, resp_soQuadBT_optParams3];
+    dlmwrite('results/butterfly_dampingOpt_r10_N200_1e4to1e6_mag.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
-    errorMatrix = [imag(s)', error_soQuadBT, error_foQuadBT, error_soLoewner, error_soBT];
-    dlmwrite('results/ButterflyReducedOrderError_r10_N200.dat', errorMatrix, ...
+    errorMatrix = [imag(s)', relSVError_soQuadBT, relSVError_soQuadBT_optParams1, ...
+        relSVError_soQuadBT_optParams2, relSVError_soQuadBT_optParams3];
+    dlmwrite('results/butterfly_dampingOpt_r10_N200_1e4to1e6_error.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
+
 
 %% Finished script.
 fprintf(1, 'FINISHED SCRIPT.\n');
@@ -465,3 +678,4 @@ fprintf(1, '================\n');
 fprintf(1, '\n');
 
 diary off
+
