@@ -1,0 +1,23 @@
+name: Code, Data, and Results for Numerical Experiments in "Data-driven 
+ balanced truncation for second-order systems with generalized proportional 
+ damping"
+version: 1.0
+release-date: 2025-06-11
+id: 10.5281/zenodo.
+id-type: doi
+authors: Sean Reiter, Steffen W. R. Werner
+orcids: 0000-0002-7510-1530, 0000-0003-1667-4862
+topic: Data-driven balanced truncation for second-order dynamical systems.
+type: Companion code
+license: BSD-2-Clause
+license-type: Open
+repository: private development
+repository-type: git
+languages: MATLAB
+dependencies: MATLAB (2023b), MORLAB—The Model Order Reduction LABoratory 
+ version 6.0
+systems: Mac
+website: https://zenodo.org/record/
+keywords:  Data-Driven Modeling, Reduced-Order Modeling, Second-Order 
+ Systems, Mechanical Systems, Balanced Truncation, Transfer Function Data,
+ MATLAB
