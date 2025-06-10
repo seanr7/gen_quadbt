@@ -4,7 +4,7 @@
 %
 
 %
-% This file is part of the archive Code, Data, and Results for Numerical 
+% This file is part of the archive Code, Data and Results for Numerical 
 % Experiments in "Data-driven balanced truncation for second-order systems
 % with generalized proportional damping"
 % Copyright (c) 2025 Sean Reiter, Steffen W. R. Werner
@@ -13,7 +13,7 @@
 %
 
 clc;
-clear all;
+clear;
 close all;
 
 % Get and set all paths

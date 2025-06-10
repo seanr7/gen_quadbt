@@ -60,9 +60,9 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_hermite_loewner_factory(points, ...
 % 
 
 %
-% This file is part of the archive Code and Results for Numerical 
-% Experiments in "Data-driven balanced truncation for second-order systems
-% with generalized proportional damping"
+% This file is part of the archive Code, Data and Results for Numerical 
+% Experiments in "Data-driven balanced truncation for second-order 
+% systems with generalized proportional damping"
 % Copyright (c) 2025 Sean Reiter, Steffen W. R. Werner
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)

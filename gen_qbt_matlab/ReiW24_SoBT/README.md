@@ -1,4 +1,4 @@
-Code, Data, and Results for Numerical Experiments in "Data-driven 
+Code, Data and Results for Numerical Experiments in "Data-driven 
 balanced truncation for second-order systems with generalized proportional 
 damping"
 ===========================================================================
@@ -74,7 +74,7 @@ The DOI for version 1.0 is
 
 ### Cite as
 
-S. Reiter and S. W. R. Werner. Code, data, and results for numerical 
+S. Reiter and S. W. R. Werner. Code, data and results for numerical 
 experiments in "Data-driven balanced truncation for second-order systems 
 with generalized proportional damping" (version 1.0), June 2025. 
 doi:10.5281/zenodo.1157038
@@ -82,13 +82,14 @@ doi:10.5281/zenodo.1157038
 
 ### BibTeX
 
-    @MISC{supReiW25,
-      author =       {Reiter, S. and Werner, S.~W.~R.},
-      title  =       {Code, data, and results for numerical 
-                      experiments in "Data-driven balanced truncation for 
-                      second-order systems with generalized proportional 
-                      damping" (version 1.0)},
-      month  =       jun,
-      year   =       {2025},
-      doi    =       {10.5281/zenodo.1157038}
-    }
+```BibTeX
+@MISC{supReiW25,
+  author =       {Reiter, S. and Werner, S.~W.~R.},
+  title  =       {Code, Data and Results for Numerical Experiments in
+                  ``{D}ata-driven balanced truncation for second-order systems
+                  with generalized proportional damping'' (version 1.0)},
+  month  =       jun,
+  year   =       {2025},
+  doi    =       {10.5281/zenodo.1157038}
+}
+````
