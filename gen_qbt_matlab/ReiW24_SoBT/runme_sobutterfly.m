@@ -129,7 +129,6 @@ Mbar_soQuadBT = Jp'*Mbar_soQuadBT*Jm; Kbar_soQuadBT  = Jp'*Kbar_soQuadBT*Jm;
 Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);  
 Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
 Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
-Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
 
 recomputeModel = false;
 if recomputeModel
@@ -175,7 +174,6 @@ Mbar_soLoewner = Jp'*Mbar_soLoewner*Jm; Kbar_soLoewner  = Jp'*Kbar_soLoewner*Jm;
 Mbar_soLoewner = real(Mbar_soLoewner);  Kbar_soLoewner  = real(Kbar_soLoewner);  
 Bbar_soLoewner = Jp'*Bbar_soLoewner;    CpBar_soLoewner = CpBar_soLoewner*Jm;
 Bbar_soLoewner = real(Bbar_soLoewner);  CpBar_soLoewner = real(CpBar_soLoewner);
-Dbar_soLoewner = alpha*Mbar_soLoewner + beta*Kbar_soLoewner;
 
 recomputeModel = false;
 if recomputeModel
@@ -676,12 +674,12 @@ end
 %% Part 3.
 % Symmetric system, second-order Hermite Loewner matrices.
 
-% Cp models average displacement of electrode 1 in x-, y-, and
+% Cp models average displacement of all four electrodes in x-, y-, and
 % z-directions; input matrix is taken to be Cp'.
-Cp          = spalloc(1, n, 3); 
-Cp(1, 3295) = 1/n;
-Cp(1, 3296) = 1/n;
-Cp(1, 3297) = 1/n;
+Cp          = spalloc(1, n, 12); 
+Cp(1, 3295) = 1/12; Cp(1, 4147) = 1/12; Cp(1, 9463) = 1/12; Cp(1, 12334) = 1/12;
+Cp(1, 3296) = 1/12; Cp(1, 4148) = 1/12; Cp(1, 9464) = 1/12; Cp(1, 12335) = 1/12;
+Cp(1, 3297) = 1/12; Cp(1, 4149) = 1/12; Cp(1, 9465) = 1/12; Cp(1, 12336) = 1/12;
 B           = Cp';
 p           = 1;
 
@@ -697,19 +695,16 @@ weights    = weights(I);
 % Order of reduction.
 r = 20;
 
-GsLeft_singleOut  = zeros(p, m, nNodes);
-GsRight_singleOut = zeros(p, m, nNodes);
-Gs_singleOut      = zeros(p, m, nNodes);
-GsDeriv_singleOut = zeros(p, m, nNodes);
-
-% Transfer function derivatievs.
-recomputeSamples = true;
+% Transfer function derivatives.
+recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
     % Space allocation.
-    Gs      = zeros(p, m, nNodes);
-    GsDeriv = zeros(p, m, nNodes);
+    GsLeft_singleOut  = zeros(p, m, nNodes);
+    GsRight_singleOut = zeros(p, m, nNodes);
+    Gs_singleOut      = zeros(p, m, nNodes);
+    GsDeriv_singleOut = zeros(p, m, nNodes);
     for k = 1:nNodes
         % Requisite linear solves.
         tic
@@ -741,7 +736,8 @@ fprintf(1, '--------------------------------------\n')
 timeLoewner = tic;
 
 % Loewner matrices.
-[Mbar_soQuadBT, ~, Kbar_soQuadBT, Bbar_soQuadBT, CpBar_soQuadBT] = ...
+% Left, right nodes and weights saved from earlier. 
+[Mbar_soQuadBT_singleOut, ~, Kbar_soQuadBT_singleOut, Bbar_soQuadBT_singleOut, CpBar_soQuadBT_singleOut] = ...
     so_loewner_factory(nodesLeft, nodesRight, weightsLeft, weightsRight, GsLeft_singleOut, ...
                        GsRight_singleOut, 'Rayleigh', [alpha, beta], 'Position');
 fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
@@ -756,37 +752,36 @@ for i = 1:nNodes/2
     Jm(1 + 2*(i - 1):2*i,   1 + 2*(i - 1):2*i)       = 1/sqrt(2)*[1,  -1i;    1,  1i];
 end
 
-Mbar_soQuadBT = Jp'*Mbar_soQuadBT*Jm; Kbar_soQuadBT  = Jp'*Kbar_soQuadBT*Jm;   
-Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);  
-Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
-Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
-Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
+Mbar_soQuadBT_singleOut = Jp'*Mbar_soQuadBT_singleOut*Jm; Kbar_soQuadBT_singleOut  = Jp'*Kbar_soQuadBT_singleOut*Jm;   
+Mbar_soQuadBT_singleOut = real(Mbar_soQuadBT_singleOut);  Kbar_soQuadBT_singleOut  = real(Kbar_soQuadBT_singleOut);  
+Bbar_soQuadBT_singleOut = Jp'*Bbar_soQuadBT_singleOut;    CpBar_soQuadBT_singleOut = CpBar_soQuadBT_singleOut*Jm;
+Bbar_soQuadBT_singleOut = real(Bbar_soQuadBT_singleOut);  CpBar_soQuadBT_singleOut = real(CpBar_soQuadBT_singleOut);
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
     timeRed = tic;
 
     % Reductor.
-    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT_singleOut);
 
     % Reduced model matrices.
     Mr_soQuadBT_singleOut  = eye(r, r);
-    Kr_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Kr_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_singleOut*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Dr_soQuadBT_singleOut  = alpha*Mr_soQuadBT_singleOut + beta*Kr_soQuadBT_singleOut;
-    Cpr_soQuadBT_singleOut = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-    Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+    Cpr_soQuadBT_singleOut = CpBar_soQuadBT_singleOut*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_singleOut;
         
     fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
     fprintf(1, '--------------------------------------\n')
 
-    filename = 'results/roButterfly_soQuadBT_singleOut_r10_N200_1e4to1e6.mat';
+    filename = 'results/roButterfly_soQuadBT_singleOut_r20_N200_1e4to1e6.mat';
     save(filename, 'Mr_soQuadBT_singleOut', 'Dr_soQuadBT_singleOut', 'Kr_soQuadBT_singleOut', 'Br_soQuadBT_singleOut', 'Cpr_soQuadBT_singleOut');
 else
     fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
-    load('results/roButterfly_soQuadBT_singleOut_r10_N200_1e4to1e6.mat')
+    load('results/roButterfly_soQuadBT_singleOut_r20_N200_1e4to1e6.mat')
 end
 
 %% 2. soQuadBT (Hermite matrices).
@@ -804,33 +799,32 @@ Mbar_soQuadBT_Hermite = Jp'*Mbar_soQuadBT_Hermite*Jm; Kbar_soQuadBT_Hermite  = J
 Mbar_soQuadBT_Hermite = real(Mbar_soQuadBT_Hermite);  Kbar_soQuadBT_Hermite  = real(Kbar_soQuadBT_Hermite);  
 Bbar_soQuadBT_Hermite = Jp'*Bbar_soQuadBT_Hermite;    CpBar_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*Jm;
 Bbar_soQuadBT_Hermite = real(Bbar_soQuadBT_Hermite);  CpBar_soQuadBT_Hermite = real(CpBar_soQuadBT_Hermite);
-Dbar_soQuadBT = alpha*Mbar_soQuadBT_Hermite + beta*Kbar_soQuadBT_Hermite;
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
     timeRed = tic;
 
     % Reductor.
-    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT_Hermite);
+    [Z_soQuadBT, S_soQuadBT, ~] = svd(Mbar_soQuadBT_Hermite);
 
     % Reduced model matrices.
     Mr_soQuadBT_Hermite  = eye(r, r);
-    Kr_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Kr_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_Hermite*(Z_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Dr_soQuadBT_Hermite  = alpha*Mr_soQuadBT_Hermite + beta*Kr_soQuadBT_Hermite;
-    Cpr_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Cpr_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*(Z_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Br_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_Hermite;
         
     fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
     fprintf(1, '--------------------------------------\n')
 
-    filename = 'results/roButterfly_soQuadBT_Hermite_r10_N200_1e4to1e6.mat';
+    filename = 'results/roButterfly_soQuadBT_Hermite_r20_N200_1e4to1e6.mat';
     save(filename, 'Mr_soQuadBT_Hermite', 'Dr_soQuadBT_Hermite', 'Kr_soQuadBT_Hermite', 'Br_soQuadBT_Hermite', 'Cpr_soQuadBT_Hermite');
 else
     fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
-    load('results/roButterfly_soQuadBT_Hermite_r10_N200_1e4to1e6.mat')
+    load('results/roButterfly_soQuadBT_Hermite_r20_N200_1e4to1e6.mat')
 end
 
 %% Plot response of reduced models.
@@ -869,7 +863,8 @@ end
 % Compute frequency response along imaginary axis.
 for ii=1:numSamples
     % Transfer functions.
-    Gr_soQuadBT                     = Cpr_soQuadBT_singleOut*((s(ii)^2*Mr_soQuadBT_singleOut + s(ii)*Dr_soQuadBT_singleOut + Kr_soQuadBT_singleOut)\Br_soQuadBT_singleOut);
+    Gr_soQuadBT                     = Cpr_soQuadBT_singleOut*((s(ii)^2*Mr_soQuadBT_singleOut ...
+        + s(ii)*Dr_soQuadBT_singleOut + Kr_soQuadBT_singleOut)\Br_soQuadBT_singleOut);
     Gr_soQuadBT_Hermite             = Cpr_soQuadBT_Hermite*((s(ii)^2*Mr_soQuadBT_Hermite ...
         + s(ii)*Dr_soQuadBT_Hermite + Kr_soQuadBT_Hermite)\Br_soQuadBT_Hermite);
 
@@ -902,8 +897,6 @@ if plotResponse
     loglog(imag(s), resp_soQuadBT_Hermite, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
     leg = legend('Full-order', 'soQuadBT', 'soQuadBT (Hermite)', ...
          'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
-    leg = legend('Full-order', 'soQuadBT (Hermite)', 'location', 'southeast', ...
-        'orientation', 'horizontal', 'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
     xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
@@ -915,8 +908,6 @@ if plotResponse
     loglog(imag(s), relSVError_soQuadBT_Hermite, '-.', 'linewidth', 2, 'color', ColMat(3,:));
     leg = legend('soQuadBT', 'soQuadBT (Hermite)', ...
          'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
-    leg = legend('soQuadBT (Hermite)', 'location', 'southeast', 'orientation', ...
-        'horizontal', 'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
     xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
@@ -928,41 +919,41 @@ end
 write = true;
 if write
     magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_soQuadBT_Hermite];
-    dlmwrite('results/butterfly_Hermite_r10_N200_1e4to1e6_mag.dat', magMatrix, ...
+    dlmwrite('results/butterfly_Hermite_r20_N200_1e4to1e6_mag.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
     errorMatrix = [imag(s)', relSVError_soQuadBT, relSVError_soQuadBT_Hermite];
-    dlmwrite('results/butterfly_Hermite_r10_N200_1e4to1e6_error.dat', errorMatrix, ...
+    dlmwrite('results/butterfly_Hermite_r20_N200_1e4to1e6_error.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
 
 %% Stability checks.
 
 rMax = 20;
-for r = 2:2:rMax
+for r = 10:2:rMax
     % Compute reduced-order model for given order r.
 
     % Reductor.
-    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT_Hermite);
+    [Z_soQuadBT, S_soQuadBT, ~] = svd(Mbar_soQuadBT_Hermite);
 
     % Reduced model matrices.
     Mr_soQuadBT_Hermite  = eye(r, r);
-    Kr_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Kr_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_Hermite*(Z_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Dr_soQuadBT_Hermite  = alpha*Mr_soQuadBT_Hermite + beta*Kr_soQuadBT_Hermite;
-    Cpr_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Cpr_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*(Z_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Br_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_Hermite;
 
     Efor_Hermite = [eye(r, r), zeros(r, r); zeros(r, r), Mr_soQuadBT_Hermite];            % Descriptor matrix; Efo = [I, 0: 0, M]
     Afor_Hermite = [zeros(r, r), eye(r, r); -Kr_soQuadBT_Hermite, - Dr_soQuadBT_Hermite]; % Afo = [0, I; -K, -D]
 
     % Reductor.
-    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT_singleOut);
 
     % Reduced model matrices.
     Mr_soQuadBT_singleOut  = eye(r, r);
-    Kr_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Kr_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_singleOut*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Dr_soQuadBT_singleOut  = alpha*Mr_soQuadBT_singleOut + beta*Kr_soQuadBT_singleOut;
-    Cpr_soQuadBT_singleOut = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
-    Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+    Cpr_soQuadBT_singleOut = CpBar_soQuadBT_singleOut*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_singleOut;
 
     Efor = [eye(r, r), zeros(r, r); zeros(r, r), Mr_soQuadBT_singleOut];    % Descriptor matrix; Efo = [I, 0: 0, M]
     Afor = [zeros(r, r), eye(r, r); -Kr_soQuadBT_singleOut, - Dr_soQuadBT_singleOut]; % Afo = [0, I; -K, -D]

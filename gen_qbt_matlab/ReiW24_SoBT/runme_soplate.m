@@ -122,7 +122,7 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     % Reductor.
     [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
@@ -150,7 +150,7 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     % Reductor.
     % Relevant SVDs.
@@ -180,7 +180,7 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     % Reductor.
     [Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
@@ -236,11 +236,11 @@ if recompute
         GfoResp(ii)   = abs(Gfo(:, :, ii));  
         fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
     end
-    save('results/_samples_N500_0to250Hz.mat', 'Gfo', 'GfoResp')
+    save('results/plateTVA_samples_N500_0to250Hz.mat', 'Gfo', 'GfoResp')
 else
     fprintf(1, 'Loading precomputed values.\n')
     fprintf(1, '--------------------------------------------------------\n')
-    load('results/_samples_N500_0to250Hz.mat')
+    load('results/plateTVA_samples_N500_0to250Hz.mat')
 end
 
 % Compute frequency response along imaginary axis.

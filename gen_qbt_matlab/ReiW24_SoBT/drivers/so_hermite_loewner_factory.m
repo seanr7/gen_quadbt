@@ -96,7 +96,7 @@ end
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% LOEWNER FACTORY.                                                        %
+% HERMITE LOEWNER FACTORY.                                                %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Space allocation.
@@ -108,7 +108,7 @@ CBAR = zeros(p, nNodes*m);
 
 % Calculation of BBAR, CBAR, same regardless of damping model.
 for k = 1:nNodes
-    BBAR((k - 1)*p + 1:k*p, :) = weights(k)*data(:, :, k); 
+    BBAR((k - 1)*p + 1:k*p, :) = weights(k)*conj(data(:, :, k)); 
     CBAR(:, (k - 1)*m + 1:k*m) = weights(k)*data(:, :, k);  
 end
 
@@ -135,7 +135,7 @@ if strcmp(damping, 'Rayleigh')
         num(k)        = points(k)^2 + alpha*points(k);
         numDeriv(k)   = 2*points(k) + alpha;
         frac(k)       = num(k)/denom(k);
-        fracDeriv(k)  = (denom(k)*numDeriv(k) - num(k)*denomDeriv(k))/denom(k)^2;
+        fracDeriv(k)  = (denom(k)*numDeriv(k) - num(k)*denomDeriv(k))/(denom(k)^2);
     end
 end
 
@@ -156,28 +156,55 @@ end
 % Block entrywise calculation of LBAR_M, LBAR_K.
 for k = 1:nNodes
     for j = 1:nNodes
-        if k ~= j
-            % Off-diagonal entries (no derivatives).
-            tmpDenom = frac(k) - frac(j);
-            tmpMult  = ((weights(k)*weights(j))/(denom(k)*denom(j)));
-            
+        % For entries corresponding to complex conjugate pairs,
+        % construction requires derivatives. 
+        if conj(points(k)) == points(j)
+            % Off-diagonal entries (with derivaties).
             % For MBAR.
-            MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -tmpMult*(denom(k)*data(:, :, k) ...
-                - denom(j)*data(:, :, j))./tmpDenom;
-    
-            % For KBAR.
-            KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = tmpMult*(num(k)*data(:, :, k) ...
-                - num(j)*data(:, :, j))./tmpDenom;
-        else
-            % Diagonal entries (derivatives).
-            % For MBAR.
-            MBAR((k - 1)*p + 1:k*p, (k - 1)*m + 1:k*m) = - (weights(k)/denom(k))^2 ...
-                *(data(:, :, k)*denomDeriv(k) + derivData(:, :, k)*denom(k))/fracDeriv(k);
+            MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = - (weights(j)*weights(k)/(denom(j)^2)) ...
+                *(data(:, :, j)*denomDeriv(j) + derivData(:, :, j)*denom(j))/fracDeriv(j);
 
             % For KBAR.
-            KBAR((k - 1)*p + 1:k*p, (k - 1)*m + 1:k*m) = (weights(k)/denom(k))^2 ...
-                *(data(:, :, k)*numDeriv(k) + derivData(:, :, k)*num(k))/fracDeriv(k);
+            KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = (weights(j)*weights(k)/(denom(j)^2)) ...
+                *(data(:, :, j)*numDeriv(j) + derivData(:, :, j)*num(j))/fracDeriv(j);
+        else
+            % Diagonal and off-diagonal entries (no derivatives for complex-valued points).
+            tmpDenom = conj(frac(k)) - frac(j);
+            tmpMult  = ((weights(k)*weights(j))/(conj(denom(k))*denom(j)));
+
+            % For MBAR.
+            MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -tmpMult*(conj(denom(k))*conj(data(:, :, k)) ...
+                - denom(j)*data(:, :, j))./tmpDenom;
+
+            % For KBAR.
+            KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = tmpMult*(conj(num(k))*conj(data(:, :, k)) ...
+                - num(j)*data(:, :, j))./tmpDenom;
         end
+
+        % Older code for incorrect construction.
+
+        % if k ~= j
+        %     % Off-diagonal entries (no derivatives).
+        %     tmpDenom = frac(k) - frac(j);
+        %     tmpMult  = ((weights(k)*weights(j))/(denom(k)*denom(j)));
+        % 
+        %     % For MBAR.
+        %     MBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = -tmpMult*(denom(k)*data(:, :, k) ...
+        %         - denom(j)*data(:, :, j))./tmpDenom;
+        % 
+        %     % For KBAR.
+        %     KBAR((k - 1)*p + 1:k*p, (j - 1)*m + 1:j*m) = tmpMult*(num(k)*data(:, :, k) ...
+        %         - num(j)*data(:, :, j))./tmpDenom;
+        % else
+        %     % Diagonal entries (derivatives).
+        %     % For MBAR.
+        %     MBAR((k - 1)*p + 1:k*p, (k - 1)*m + 1:k*m) = - (weights(k)/denom(k))^2 ...
+        %         *(data(:, :, k)*denomDeriv(k) + derivData(:, :, k)*denom(k))/fracDeriv(k);
+        % 
+        %     % For KBAR.
+        %     KBAR((k - 1)*p + 1:k*p, (k - 1)*m + 1:k*m) = (weights(k)/denom(k))^2 ...
+        %         *(data(:, :, k)*numDeriv(k) + derivData(:, :, k)*num(k))/fracDeriv(k);
+        % end
 
     end
 end

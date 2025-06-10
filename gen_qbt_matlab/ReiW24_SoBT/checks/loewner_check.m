@@ -356,7 +356,7 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-checkLoewner = true;
+checkLoewner = false;
 % checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soQuadBT).\n')
@@ -411,7 +411,7 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-checkLoewner = true;
+checkLoewner = false;
 % checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soLoewner).\n')
@@ -466,7 +466,7 @@ timeLoewner = tic;
 fprintf(1, 'CONSTRUCTION OF LOEWNER QUADRUPLE FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
-checkLoewner = true;
+checkLoewner = false;
 % checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (foQuadBT).\n')
@@ -587,7 +587,7 @@ Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CvBar_soQuadBT = CvBar_soQuadBT*Jm;
 Bbar_soQuadBT = real(Bbar_soQuadBT);  CvBar_soQuadBT = real(CvBar_soQuadBT);
 Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
 
-checkLoewner = true;
+checkLoewner = false;
 % checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soQuadBT).\n')
@@ -649,7 +649,7 @@ Bbar_soLoewner = Jp'*Bbar_soLoewner;    CvBar_soLoewner = CvBar_soLoewner*Jm;
 Bbar_soLoewner = real(Bbar_soLoewner);  CvBar_soLoewner = real(CvBar_soLoewner);
 Dbar_soLoewner = alpha*Mbar_soLoewner + beta*Kbar_soLoewner;
 
-checkLoewner = true;
+checkLoewner = false;
 % checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soLoewner).\n')
@@ -710,7 +710,7 @@ Ebar_foQuadBT = real(Ebar_foQuadBT);  Abar_foQuadBT = real(Abar_foQuadBT);
 Bbar_foQuadBT = Jp'*Bbar_foQuadBT;    Cbar_foQuadBT = Cbar_foQuadBT*Jm;
 Bbar_foQuadBT = real(Bbar_foQuadBT);  Cbar_foQuadBT = real(Cbar_foQuadBT);
 
-checkLoewner = true;
+checkLoewner = false;
 % checkLoewner = false;
 if checkLoewner
     fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (foQuadBT).\n')
@@ -778,45 +778,43 @@ fprintf(1, '----------------------------------------------\n')
 fprintf(1, 'Loading butterfly gyroscope benchmark problem.\n')
 fprintf(1, '----------------------------------------------\n')
 
-% From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Butterfly_Gyroscope
-% Rayleigh Damping: D = alpha*M + beta*K
-%   alpha = 0;
-%   beta  = 1e-6;
-load('data/Butterfly.mat')
-
-% Rayleigh damping coefficients.
-alpha = 0;
-beta  = 1e-6;
+load('data/MSDRayleigh_Cv.mat')
+alpha = 2e-3;
+beta  = alpha;
+D     = alpha*M + beta*K;
 
 % Symmetric system, second-order Hermite Loewner matrices.
 
-% Cp models average displacement of electrode 1 in x-, y-, and
-% z-directions; input matrix is taken to be Cp'.
-Cp          = spalloc(1, n, 3); 
-Cp(1, 3295) = 1/n;
-Cp(1, 3296) = 1/n;
-Cp(1, 3297) = 1/n;
-B           = Cp';
-p           = 1;
+Cp = (1/n)*ones(1, n);
+B  = Cp';
 
 % Recompute nodes. 
 % Prepare quadrature weights and nodes according to Trapezoidal rule.
-[nodesLeft, weightsLeft, nodesRight, weightsRight] = trapezoidal_rule([a, b], ...
-    nNodes, false);
-
-% Left, right nodes are equal.
-nodes   = nodesLeft;
-weights = weightsLeft;
+[nodes, weights, ~, ~] = trapezoidal_rule([a, b], nNodes, false);
 
 % Put into complex conjugate pairs to make reduced-order model matrices
 % real valued. 
 [nodes, I] = sort(nodes, 'ascend');    
 weights    = weights(I);
 
-
-fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
-fprintf(1, '-------------------------------------------\n')
-load('results/butterfly_deriv_samples_N200_1e4to1e6.mat', 'Gs' ,'GsDeriv')
+fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
+fprintf(1, '---------------------------------\n')
+% Space allocation.
+Gs_singleOut      = zeros(p, m, nNodes);
+GsDeriv_singleOut = zeros(p, m, nNodes);
+for k = 1:nNodes
+    % Requisite linear solves.
+    tic
+    fprintf(1, 'Linear solve %d of %d.\n', k, nNodes)
+    fprintf(1, '-----------------------------\n');
+    % Transfer function data.
+    % nodesLeft, nodesRight, saved from earlier.
+    Gs_singleOut(:, :, k)      = Cp*((nodes(k)^2.*M + nodes(k).*D + K)\B);
+    GsDeriv_singleOut(:, :, k) = -Cp*((nodes(k)^2.*M + nodes(k).*D + K)\((2*nodes(k)*M + D) ...
+        *((nodes(k)^2.*M + nodes(k).*D + K)\B)));
+    fprintf(1, 'Solves finished in %.2f s.\n',toc)
+    fprintf(1, '-----------------------------\n');
+end
 
 fprintf(1, 'BUILDING HERMITE LOEWNER MATRICES (soQuadBT).\n')
 fprintf(1, '--------------------------------------\n')
@@ -824,17 +822,16 @@ timeLoewner = tic;
 
 % Loewner matrices.
 [Mbar_soQuadBT, ~, Kbar_soQuadBT, Bbar_soQuadBT, CpBar_soQuadBT] = ...
-    so_hermite_loewner_factory(nodes, weights, Gs, GsDeriv, 'Rayleigh', [alpha, beta]);
+    so_hermite_loewner_factory(nodes, weights, Gs_singleOut, GsDeriv_singleOut, 'Rayleigh', [alpha, beta]);
 fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
 fprintf(1, '------------------------------------------------------\n')
 
 % Make it real-valued.
 Jp = zeros(nNodes*p, nNodes*p);
 Jm = zeros(nNodes*m, nNodes*m);
-Ip = eye(p, p);
 for i = 1:nNodes/2
-    Jp(1 + 2*(i - 1)*p:2*i*p, 1 + 2*(i - 1)*p:2*i*p) = 1/sqrt(2)*[Ip, -1i*Ip; Ip, 1i*Ip];
-    Jm(1 + 2*(i - 1):2*i,   1 + 2*(i - 1):2*i)       = 1/sqrt(2)*[1,  -1i;    1,  1i];
+    Jp(1 + 2*(i - 1):2*i, 1 + 2*(i - 1):2*i) = 1/sqrt(2)*[1, -1i; 1, 1i];
+    Jm(1 + 2*(i - 1):2*i, 1 + 2*(i - 1):2*i) = 1/sqrt(2)*[1, -1i; 1, 1i];
 end
 
 Mbar_soQuadBT = Jp'*Mbar_soQuadBT*Jm; Kbar_soQuadBT  = Jp'*Kbar_soQuadBT*Jm;   
@@ -864,8 +861,8 @@ if checkLoewner
             + nodes(k).*D + K)\B));
     
         % For (velocity) observability Gramian.
-        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = conj(weights(k))*(((conj(nodes(k))^2.*M' ...
-            + conj(nodes(k)).*D' + K')\Cp'));
+        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = (weights(k))*((((nodes(k))^2.*M' ...
+            + (nodes(k)).*D' + K')\Cp'));
 
         fprintf(1, 'Solves finished in %.2f s.\n', toc(solveTime))
         fprintf(1, '-----------------------------\n');
@@ -874,16 +871,26 @@ if checkLoewner
     fprintf(1, '------------------------------------------\n')
     
     fprintf('-----------------------------------------------------------------------------------\n')
+    % fprintf('Check for Mbar  : Error || Mbar  - leftObsvFactor.H * M * rightContFactor ||_2: %.16f\n', ...
+    %     norm(leftObsvFactor'*M*rightContFactor - Mbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*M*rightContFactor*Jm, 'fro'))
+    % fprintf('Check for Dbar  : Error || Dbar  - leftObsvFactor.H * D * rightContFactor ||_2: %.16f\n', ...
+    %     norm(leftObsvFactor'*D*rightContFactor - Dbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*D*rightContFactor*Jm, 'fro'))
+    % fprintf('Check for Kbar  : Error || Kbar  - leftObsvFactor.H * K * rightContFactor ||_2: %.16f\n', ...
+    %     norm(leftObsvFactor'*K*rightContFactor - Kbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*K*rightContFactor*Jm, 'fro'))
+    % fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
+    %     norm(leftObsvFactor'*B - Bbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*B, 'fro'))
+    % fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                   ||_2: %.16f\n', ...
+    %     norm(Cp*rightContFactor - CpBar_soQuadBT, 'fro')/norm(Cp*rightContFactor*Jm, 'fro'))
     fprintf('Check for Mbar  : Error || Mbar  - leftObsvFactor.H * M * rightContFactor ||_2: %.16f\n', ...
-        norm(Jp'*leftObsvFactor'*M*rightContFactor*Jm - Mbar_soQuadBT, 2))
+        norm(Jp'*leftObsvFactor'*M*rightContFactor*Jm - Mbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*M*rightContFactor*Jm, 'fro'))
     fprintf('Check for Dbar  : Error || Dbar  - leftObsvFactor.H * D * rightContFactor ||_2: %.16f\n', ...
-        norm(Jp'*leftObsvFactor'*D*rightContFactor*Jm - Dbar_soQuadBT, 2))
+        norm(Jp'*leftObsvFactor'*D*rightContFactor*Jm - Dbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*D*rightContFactor*Jm, 'fro'))
     fprintf('Check for Kbar  : Error || Kbar  - leftObsvFactor.H * K * rightContFactor ||_2: %.16f\n', ...
-        norm(Jp'*leftObsvFactor'*K*rightContFactor*Jm - Kbar_soQuadBT, 2))
+        norm(Jp'*leftObsvFactor'*K*rightContFactor*Jm - Kbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*K*rightContFactor*Jm, 'fro'))
     fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
-        norm(Jp'*leftObsvFactor'*B - Bbar_soQuadBT, 2))
+        norm(Jp'*leftObsvFactor'*B - Bbar_soQuadBT, 'fro')/norm(Jp'*leftObsvFactor'*B, 'fro'))
     fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                   ||_2: %.16f\n', ...
-        norm(Cp*rightContFactor*Jm - CpBar_soQuadBT, 2))
+        norm(Cp*rightContFactor*Jm - CpBar_soQuadBT, 'fro')/norm(Cp*rightContFactor*Jm, 'fro'))
     fprintf('-----------------------------------------------------------------------------------\n')
 else
     fprintf(1, 'Not verifying Loewner build; moving on.\n')

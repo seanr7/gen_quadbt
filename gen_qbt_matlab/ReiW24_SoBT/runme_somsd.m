@@ -426,7 +426,6 @@ for ii=1:numSamples
 end
 
 plotResponse = true;
-% plotResponse = false;
 if plotResponse
     % Plot colors
     ColMat      = zeros(6,3);
