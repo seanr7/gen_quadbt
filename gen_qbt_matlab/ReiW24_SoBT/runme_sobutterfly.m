@@ -762,7 +762,7 @@ Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
 Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
 Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
 
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -837,7 +837,7 @@ end
 % Transfer function evaluations.
 Gr_soQuadBT_Hermite = zeros(p, m, numSamples);
 
-Response and errors.
+% Response and errors.
 resp_soQuadBT               = zeros(numSamples, 1); % Response of soQuadBT reduced model with usual Loewner matrices
 relSVError_soQuadBT         = zeros(numSamples, 1); % Error due to soQuadBT reduced model with usual Loewner matrices
 

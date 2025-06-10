@@ -32,8 +32,9 @@ function [nodesLeft, weightsLeft, nodesRight, weightsRight] = ...
 
 %
 % This file is part of the archive Code and Results for Numerical 
-% Experiments in "..."
-% Copyright (c) 2024 Sean Reiter, Steffen W. R. Werner
+% Experiments in "Data-driven balanced truncation for second-order systems
+% with generalized proportional damping"
+% Copyright (c) 2025 Sean Reiter, Steffen W. R. Werner
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)
 %
