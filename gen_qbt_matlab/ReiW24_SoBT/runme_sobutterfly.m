@@ -590,8 +590,10 @@ Gr_soQuadBT_optParams3 = zeros(p, m, numSamples);
 % Response and errors.
 resp_soQuadBT_optParams1       = zeros(numSamples, 1); % Response of reduced model 1
 relSVError_soQuadBT_optParams1 = zeros(numSamples, 1); % Error due to reduced model 1
+
 resp_soQuadBT_optParams2       = zeros(numSamples, 1); % Response of reduced model 2
 relSVError_soQuadBT_optParams2 = zeros(numSamples, 1); % Error due to reduced model 2
+
 resp_soQuadBT_optParams3       = zeros(numSamples, 1); % Response of reduced model 3
 relSVError_soQuadBT_optParams3 = zeros(numSamples, 1); % Error due to reduced model 3
 
@@ -671,6 +673,317 @@ if write
         'delimiter', '\t', 'precision', 8);
 end
 
+%% Part 3.
+% Symmetric system, second-order Hermite Loewner matrices.
+
+% Cp models average displacement of electrode 1 in x-, y-, and
+% z-directions; input matrix is taken to be Cp'.
+Cp          = spalloc(1, n, 3); 
+Cp(1, 3295) = 1/n;
+Cp(1, 3296) = 1/n;
+Cp(1, 3297) = 1/n;
+B           = Cp';
+p           = 1;
+
+% Recompute nodes. 
+% Prepare quadrature weights and nodes according to Trapezoidal rule.
+[nodes, weights, ~, ~] = trapezoidal_rule([a, b], nNodes, false);
+
+% Put into complex conjugate pairs to make reduced-order model matrices
+% real valued. 
+[nodes, I] = sort(nodes, 'ascend');    
+weights    = weights(I);
+
+% Order of reduction.
+r = 20;
+
+GsLeft_singleOut  = zeros(p, m, nNodes);
+GsRight_singleOut = zeros(p, m, nNodes);
+Gs_singleOut      = zeros(p, m, nNodes);
+GsDeriv_singleOut = zeros(p, m, nNodes);
+
+% Transfer function derivatievs.
+recomputeSamples = true;
+if recomputeSamples
+    fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
+    fprintf(1, '---------------------------------\n')
+    % Space allocation.
+    Gs      = zeros(p, m, nNodes);
+    GsDeriv = zeros(p, m, nNodes);
+    for k = 1:nNodes
+        % Requisite linear solves.
+        tic
+        fprintf(1, 'Linear solve %d of %d.\n', k, nNodes)
+        fprintf(1, '-----------------------------\n');
+        % Transfer function data.
+        % nodesLeft, nodesRight, saved from earlier.
+        GsLeft_singleOut(:, :, k)  = Cp*((nodesLeft(k)^2.*M + nodesLeft(k).*D + K)\B);
+        GsRight_singleOut(:, :, k) = Cp*((nodesRight(k)^2.*M + nodesRight(k).*D + K)\B);
+        Gs_singleOut(:, :, k)      = Cp*((nodes(k)^2.*M + nodes(k).*D + K)\B);
+        GsDeriv_singleOut(:, :, k) = -Cp*((nodes(k)^2.*M + nodes(k).*D + K)\((2*nodes(k)*M + D) ...
+            *((nodes(k)^2.*M + nodes(k).*D + K)\B)));
+        fprintf(1, 'Solves finished in %.2f s.\n',toc)
+        fprintf(1, '-----------------------------\n');
+    end
+    save('results/butterfly_deriv_samples_N200_1e4to1e6.mat', 'Gs_singleOut', 'GsDeriv_singleOut', ...
+        'GsLeft_singleOut', 'GsRight_singleOut', 'nodes')
+else
+    fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
+    fprintf(1, '-------------------------------------------\n')
+    load('results/butterfly_deriv_samples_N200_1e4to1e6.mat', 'Gs_singleOut' ,'GsDeriv_singleOut', ...
+        'GsLeft_singleOut', 'GsRight_singleOut')
+end
+
+%% Reduced-order models.
+%% 1. soQuadBT.
+fprintf(1, 'BUILDING LOEWNER MATRICES (soQuadBT).\n')
+fprintf(1, '--------------------------------------\n')
+timeLoewner = tic;
+
+% Loewner matrices.
+[Mbar_soQuadBT, ~, Kbar_soQuadBT, Bbar_soQuadBT, CpBar_soQuadBT] = ...
+    so_loewner_factory(nodesLeft, nodesRight, weightsLeft, weightsRight, GsLeft_singleOut, ...
+                       GsRight_singleOut, 'Rayleigh', [alpha, beta], 'Position');
+fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
+fprintf(1, '------------------------------------------------------\n')
+
+% Make it real-valued.
+Jp = zeros(nNodes*p, nNodes*p);
+Jm = zeros(nNodes*m, nNodes*m);
+Ip = eye(p, p);
+for i = 1:nNodes/2
+    Jp(1 + 2*(i - 1)*p:2*i*p, 1 + 2*(i - 1)*p:2*i*p) = 1/sqrt(2)*[Ip, -1i*Ip; Ip, 1i*Ip];
+    Jm(1 + 2*(i - 1):2*i,   1 + 2*(i - 1):2*i)       = 1/sqrt(2)*[1,  -1i;    1,  1i];
+end
+
+Mbar_soQuadBT = Jp'*Mbar_soQuadBT*Jm; Kbar_soQuadBT  = Jp'*Kbar_soQuadBT*Jm;   
+Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);  
+Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
+Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
+Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
+
+recomputeModel = false;
+if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
+
+    % Reduced model matrices.
+    Mr_soQuadBT_singleOut  = eye(r, r);
+    Kr_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT_singleOut  = alpha*Mr_soQuadBT_singleOut + beta*Kr_soQuadBT_singleOut;
+    Cpr_soQuadBT_singleOut = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+        
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
+
+    filename = 'results/roButterfly_soQuadBT_singleOut_r10_N200_1e4to1e6.mat';
+    save(filename, 'Mr_soQuadBT_singleOut', 'Dr_soQuadBT_singleOut', 'Kr_soQuadBT_singleOut', 'Br_soQuadBT_singleOut', 'Cpr_soQuadBT_singleOut');
+else
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    load('results/roButterfly_soQuadBT_singleOut_r10_N200_1e4to1e6.mat')
+end
+
+%% 2. soQuadBT (Hermite matrices).
+fprintf(1, 'BUILDING HERMITE LOEWNER MATRICES (soQuadBT).\n')
+fprintf(1, '--------------------------------------\n')
+timeLoewner = tic;
+
+% Loewner matrices.
+[Mbar_soQuadBT_Hermite, ~, Kbar_soQuadBT_Hermite, Bbar_soQuadBT_Hermite, CpBar_soQuadBT_Hermite] = ...
+    so_hermite_loewner_factory(nodes, weights, Gs_singleOut, GsDeriv_singleOut, 'Rayleigh', [alpha, beta]);
+fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
+fprintf(1, '------------------------------------------------------\n')
+
+Mbar_soQuadBT_Hermite = Jp'*Mbar_soQuadBT_Hermite*Jm; Kbar_soQuadBT_Hermite  = Jp'*Kbar_soQuadBT_Hermite*Jm;   
+Mbar_soQuadBT_Hermite = real(Mbar_soQuadBT_Hermite);  Kbar_soQuadBT_Hermite  = real(Kbar_soQuadBT_Hermite);  
+Bbar_soQuadBT_Hermite = Jp'*Bbar_soQuadBT_Hermite;    CpBar_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*Jm;
+Bbar_soQuadBT_Hermite = real(Bbar_soQuadBT_Hermite);  CpBar_soQuadBT_Hermite = real(CpBar_soQuadBT_Hermite);
+Dbar_soQuadBT = alpha*Mbar_soQuadBT_Hermite + beta*Kbar_soQuadBT_Hermite;
+
+recomputeModel = true;
+if recomputeModel
+    fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    timeRed = tic;
+
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT_Hermite);
+
+    % Reduced model matrices.
+    Mr_soQuadBT_Hermite  = eye(r, r);
+    Kr_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT_Hermite  = alpha*Mr_soQuadBT_Hermite + beta*Kr_soQuadBT_Hermite;
+    Cpr_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_Hermite;
+        
+    fprintf(1, 'REDUCED-ORDER MODEL COMPUTED IN %.2f s\n', toc(timeRed))
+    fprintf(1, '--------------------------------------\n')
+
+    filename = 'results/roButterfly_soQuadBT_Hermite_r10_N200_1e4to1e6.mat';
+    save(filename, 'Mr_soQuadBT_Hermite', 'Dr_soQuadBT_Hermite', 'Kr_soQuadBT_Hermite', 'Br_soQuadBT_Hermite', 'Cpr_soQuadBT_Hermite');
+else
+    fprintf(1, 'NOT RE-COMPUTING; LOAD REDUCED-ORDER MODEL (soQuadBT).\n')
+    fprintf(1, '--------------------------------------\n')
+    load('results/roButterfly_soQuadBT_Hermite_r10_N200_1e4to1e6.mat')
+end
+
+%% Plot response of reduced models.
+% Transfer function evaluations.
+Gr_soQuadBT_Hermite = zeros(p, m, numSamples);
+
+Response and errors.
+resp_soQuadBT               = zeros(numSamples, 1); % Response of soQuadBT reduced model with usual Loewner matrices
+relSVError_soQuadBT         = zeros(numSamples, 1); % Error due to soQuadBT reduced model with usual Loewner matrices
+
+resp_soQuadBT_Hermite       = zeros(numSamples, 1); % Response of soQuadBT reduced model with Hermite Loewner matrices
+relSVError_soQuadBT_Hermite = zeros(numSamples, 1); % Error due to soQuadBT reduced model with Hermite Loewner matrices
+
+% Recompute full-order simulation data for new output.
+recompute = false;
+if recompute
+    Gfo     = zeros(p, m, numSamples);
+    GfoResp = zeros(numSamples, 1);
+    fprintf(1, 'Sampling full-order transfer function along i[1e4, 1e6].\n')
+    fprintf(1, '--------------------------------------------------------\n')
+    for ii = 1:numSamples
+        timeSolve = tic;
+        fprintf(1, 'Frequency step %d, s=1i*%.10f ...\n ', ii, imag(s(ii)))
+        Gfo(:, :, ii) = Cp*((s(ii)^2*M +s(ii)*D + K)\B);
+        GfoResp(ii)   = max(svd(Gfo(:, :, ii)));        % Matrix 2-norm
+        fprintf(1, 'k = %d solve finished in %.2f s\n', ii, toc(timeSolve))
+    end
+    save('results/butterfly_deriv_samples_N500_1e4to1e6.mat', 'Gfo', 'GfoResp')
+else
+    fprintf(1, 'Loading precomputed values.\n')
+    fprintf(1, '--------------------------------------------------------\n')
+    load('results/butterfly_deriv_samples_N500_1e4to1e6.mat')
+end
+
+% Response of full-order and soQuadBT reduced-order already computed.
+% Compute frequency response along imaginary axis.
+for ii=1:numSamples
+    % Transfer functions.
+    Gr_soQuadBT                     = Cpr_soQuadBT_singleOut*((s(ii)^2*Mr_soQuadBT_singleOut + s(ii)*Dr_soQuadBT_singleOut + Kr_soQuadBT_singleOut)\Br_soQuadBT_singleOut);
+    Gr_soQuadBT_Hermite             = Cpr_soQuadBT_Hermite*((s(ii)^2*Mr_soQuadBT_Hermite ...
+        + s(ii)*Dr_soQuadBT_Hermite + Kr_soQuadBT_Hermite)\Br_soQuadBT_Hermite);
+
+    resp_soQuadBT(ii)               = abs(Gr_soQuadBT);
+    resp_soQuadBT_Hermite(ii)       = abs(Gr_soQuadBT_Hermite);
+
+    relSVError_soQuadBT(ii)         = abs(Gfo(:, :, ii) - Gr_soQuadBT)/GfoResp(ii);
+    relSVError_soQuadBT_Hermite(ii) = abs(Gfo(:, :, ii) - Gr_soQuadBT_Hermite)/GfoResp(ii);
+end
+
+
+plotResponse = true;
+if plotResponse
+    % Plot colors
+    ColMat      = zeros(6,3);
+    ColMat(1,:) = [0.8500    0.3250    0.0980];
+    ColMat(2,:) = [0.3010    0.7450    0.9330];
+    ColMat(3,:) = [0.9290    0.6940    0.1250];
+    ColMat(4,:) = [0.4660    0.6740    0.1880];
+    ColMat(5,:) = [0.4940    0.1840    0.5560];
+    ColMat(6,:) = [1         0.4       0.6];
+    
+    figure
+    fs = 12;
+    % Magnitudes.
+    set(gca, 'fontsize', 10)
+    subplot(2,1,1)
+    loglog(imag(s), GfoResp,               '-o', 'linewidth', 2, 'color', ColMat(1,:)); hold on
+    loglog(imag(s), resp_soQuadBT,         '--', 'linewidth', 2, 'color', ColMat(2,:)); 
+    loglog(imag(s), resp_soQuadBT_Hermite, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
+    leg = legend('Full-order', 'soQuadBT', 'soQuadBT (Hermite)', ...
+         'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
+    leg = legend('Full-order', 'soQuadBT (Hermite)', 'location', 'southeast', ...
+        'orientation', 'horizontal', 'interpreter', 'latex');
+    xlim([imag(s(1)), imag(s(end))])
+    set(leg, 'fontsize', 10, 'interpreter', 'latex')
+    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('$||\mathbf{G}(s)||_2$', 'fontsize', fs, 'interpreter', 'latex')
+    
+    % Relative errors.
+    subplot(2,1,2)
+    loglog(imag(s), relSVError_soQuadBT,         '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
+    loglog(imag(s), relSVError_soQuadBT_Hermite, '-.', 'linewidth', 2, 'color', ColMat(3,:));
+    leg = legend('soQuadBT', 'soQuadBT (Hermite)', ...
+         'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
+    leg = legend('soQuadBT (Hermite)', 'location', 'southeast', 'orientation', ...
+        'horizontal', 'interpreter', 'latex');
+    xlim([imag(s(1)), imag(s(end))])
+    set(leg, 'fontsize', 10, 'interpreter', 'latex')
+    xlabel('$i*\omega$', 'fontsize', fs, 'interpreter', 'latex')
+    ylabel('$||\mathbf{G}(s)-\mathbf{G}_{r}(s)||_2/||\mathbf{G}(s)||_2$', 'fontsize', ...
+        fs, 'interpreter', 'latex')
+end
+
+% Store data.
+write = true;
+if write
+    magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_soQuadBT_Hermite];
+    dlmwrite('results/butterfly_Hermite_r10_N200_1e4to1e6_mag.dat', magMatrix, ...
+        'delimiter', '\t', 'precision', 8);
+    errorMatrix = [imag(s)', relSVError_soQuadBT, relSVError_soQuadBT_Hermite];
+    dlmwrite('results/butterfly_Hermite_r10_N200_1e4to1e6_error.dat', errorMatrix, ...
+        'delimiter', '\t', 'precision', 8);
+end
+
+%% Stability checks.
+
+rMax = 20;
+for r = 2:2:rMax
+    % Compute reduced-order model for given order r.
+
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT_Hermite);
+
+    % Reduced model matrices.
+    Mr_soQuadBT_Hermite  = eye(r, r);
+    Kr_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT_Hermite  = alpha*Mr_soQuadBT_Hermite + beta*Kr_soQuadBT_Hermite;
+    Cpr_soQuadBT_Hermite = CpBar_soQuadBT_Hermite*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT_Hermite  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_Hermite;
+
+    Efor_Hermite = [eye(r, r), zeros(r, r); zeros(r, r), Mr_soQuadBT_Hermite];            % Descriptor matrix; Efo = [I, 0: 0, M]
+    Afor_Hermite = [zeros(r, r), eye(r, r); -Kr_soQuadBT_Hermite, - Dr_soQuadBT_Hermite]; % Afo = [0, I; -K, -D]
+
+    % Reductor.
+    [Z_soQuadBT, S_soQuadBT, Y_soQuadBT] = svd(Mbar_soQuadBT);
+
+    % Reduced model matrices.
+    Mr_soQuadBT_singleOut  = eye(r, r);
+    Kr_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Kbar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Dr_soQuadBT_singleOut  = alpha*Mr_soQuadBT_singleOut + beta*Kr_soQuadBT_singleOut;
+    Cpr_soQuadBT_singleOut = CpBar_soQuadBT*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
+    Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT;
+
+    Efor = [eye(r, r), zeros(r, r); zeros(r, r), Mr_soQuadBT_singleOut];    % Descriptor matrix; Efo = [I, 0: 0, M]
+    Afor = [zeros(r, r), eye(r, r); -Kr_soQuadBT_singleOut, - Dr_soQuadBT_singleOut]; % Afo = [0, I; -K, -D]
+
+    % Compute all eigs to validate stability via linearized problem. 
+    tmp1 = eig(Afor_Hermite, Efor_Hermite);
+    if any(real(tmp1) > 0)
+        fprintf(1, 'ORDER r = %d soQuadBT (Hermite) REDUCED MODEL IS UNSTABLE!\n', r)
+    else
+        fprintf(1, 'ORDER r = %d soQuadBT (Hermite) REDUCED MODEL IS STABLE!\n', r)
+    end
+
+    tmp2 = eig(Afor, Efor);
+    if any(real(tmp2) > 0)
+        fprintf(1, 'ORDER r = %d soQuadBT REDUCED MODEL IS UNSTABLE!\n', r)
+    else
+        fprintf(1, 'ORDER r = %d soQuadBT REDUCED MODEL IS STABLE!\n', r)
+    end
+    fprintf(1, '-----------------------------------------------\n')
+
+end
 
 %% Finished script.
 fprintf(1, 'FINISHED SCRIPT.\n');

@@ -49,12 +49,20 @@ fprintf(1, '-----------------------------------\n');
 % Rayleigh Damping: D = alpha*M + beta*K
 %   alpha = 2e-3;
 %   beta  = 2e-3;
-load('data/MSDRayleigh_Cv.mat')
-alpha = 2e-3;
-beta  = alpha;
+% load('data/MSDRayleigh_Cv.mat')
+% alpha = 2e-3;
+% beta  = alpha;
 
-%% Part 1.
-% Velocity ouputs.
+n1 = 300;   alpha = .002;   beta = alpha;   v = 0;
+
+[M, D, K] = triplechain_MSD(n1, alpha, beta, v);
+
+% Input, output, state dimensions.
+n = size(full(K), 1);   p = 1;  m = 1;
+
+% Input and velocity-output matrices.
+B  = ones(n, m);   
+Cv = ones(p, n);
 
 %% Reduced order models.
 % Test performance from i[1e-3, 1e1].
@@ -75,7 +83,7 @@ weightsRight         = weightsRight(Iright);
 r = 20;
 
 % Transfer function data.
-recomputeSamples = true;
+recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -129,7 +137,7 @@ Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CvBar_soQuadBT = CvBar_soQuadBT*Jm;
 Bbar_soQuadBT = real(Bbar_soQuadBT);  CvBar_soQuadBT = real(CvBar_soQuadBT);
 Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -175,7 +183,7 @@ Bbar_soLoewner = Jp'*Bbar_soLoewner;    CvBar_soLoewner = CvBar_soLoewner*Jm;
 Bbar_soLoewner = real(Bbar_soLoewner);  CvBar_soLoewner = real(CvBar_soLoewner);
 Dbar_soLoewner = alpha*Mbar_soLoewner + beta*Kbar_soLoewner;
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soLoewner).\n')
     fprintf(1, '--------------------------------------\n')
@@ -221,7 +229,7 @@ Ebar_foQuadBT = real(Ebar_foQuadBT);  Abar_foQuadBT = real(Abar_foQuadBT);
 Bbar_foQuadBT = Jp'*Bbar_foQuadBT;    Cbar_foQuadBT = Cbar_foQuadBT*Jm;
 Bbar_foQuadBT = real(Bbar_foQuadBT);  Cbar_foQuadBT = real(Cbar_foQuadBT);
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     % Reductor.
     [Z_foQuadBT, S_foQuadBT, Y_foQuadBT] = svd(Ebar_foQuadBT);
@@ -240,7 +248,7 @@ else
 end
 
 %% 4. soBT.
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -281,7 +289,7 @@ else
 end
 
 %% 5. foBt.
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -493,11 +501,6 @@ fprintf(1, 'Relative H-2 error due to soBT         : %.16f \n', sqrt(sum(absErro
 fprintf(1, 'Relative H-2 error due to foBT         : %.16f \n', sqrt(sum(absError_foBT.^2)/sum(GfoResp.^2)))
 fprintf(1, '------------------------------------------------------------\n')
 
-%% Part 2.
-% Position ouputs, symmetric system.
-Cp = B';
-
-%% Reduced-order models.
 
 %% Finished script.
 fprintf(1, 'FINISHED SCRIPT.\n');

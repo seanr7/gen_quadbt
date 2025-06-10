@@ -3,7 +3,7 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightP
                                                              leftData,    rightData, ...
                                                              damping,     DParam, ...
                                                              output)
-%LOEWNER_FACTORY Factory function for (second-order) Loewner matrix 
+%SO_LOEWNER_FACTORY Factory function for (second-order) Loewner matrix 
 % quintuples.
 %
 % SYNTAX:
@@ -52,8 +52,8 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightP
 % OUTPUTS: 
 %   MBAR - nLeft*p x nRight*m diagonally scaled Loewner matrix; 
 %          corresponds to mass matrix M in so system realization 
-%   DBAR - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
-%          corresponds to damping matrix D in so system realization 
+%   DBAR - nLeft*p x nRight*m matrix; corresponds to damping matrix D in so 
+%          system realization 
 %   KBAR - nLeft*p x nRight*m diagonally scaled shifted Loewner matrix;
 %          corresponds to stiffness matrix K in so system realization 
 %   BBAR - nLeft*p x m matrix of left data; in (3) corresponds to input 
@@ -72,7 +72,7 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_loewner_factory(leftPoints,  rightP
 % License: BSD 2-Clause license (see COPYING)
 %
 % Virginia Tech, USA
-% Last editied: 5/28/2025
+% Last editied: 6/9/2025
 %
 
 %%
@@ -113,7 +113,7 @@ KBAR = zeros(nLeft*p, nRight*m);
 BBAR = zeros(nLeft*p, m);
 CBAR = zeros(p, nRight*m);
 
-% Calculation of HBAR, GBAR, same regardless of damping model.
+% Calculation of BBAR, CBAR, same regardless of damping model.
 for k = 1:nLeft
     BBAR((k - 1)*p + 1:k*p, :) = leftWeights(k)*leftData(:, :, k); 
 end
@@ -170,7 +170,7 @@ if strcmp(damping, 'Structural')
     end
 end
 
-% Block entrywise calculation of LBAR_M, LBAR_K.
+% Block entrywise calculation of MBAR, KBAR.
 for k = 1:nLeft
     for j = 1:nRight
         tmpDenom = fracLeft(k) - fracRight(j);

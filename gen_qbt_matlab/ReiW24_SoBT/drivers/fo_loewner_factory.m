@@ -6,8 +6,8 @@ function [EBAR, ABAR, BBAR, CBAR] = fo_loewner_factory(leftPoints,  rightPoints,
 %
 % SYNTAX:
 %   [EBAR, ABAR, BBAR, CBAR] = fo_loewner_factory(leftPoints,  rightPoints, ...
-%                                                  leftWeights, rightWeights, ...
-%                                                  leftSamples, rightSamples)
+%                                                 leftWeights, rightWeights, ...
+%                                                 leftSamples, rightSamples)
 %
 % DESCRIPTION:
 %   This is a factory function to compute Loewner matrix quadruples
@@ -47,14 +47,15 @@ function [EBAR, ABAR, BBAR, CBAR] = fo_loewner_factory(leftPoints,  rightPoints,
 % 
 
 %
-% This file is part of the archive Code, Data, and Results for Numerical 
-% Experiments in "..."
-% Copyright (c) 2024 Sean Reiter, Steffen W. R. Werner
+% This file is part of the archive Code and Results for Numerical 
+% Experiments in "Data-driven balanced truncation for second-order systems
+% with generalized proportional damping"
+% Copyright (c) 2025 Sean Reiter, Steffen W. R. Werner
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)
 %
 % Virginia Tech, USA
-% Last editied: 9/4/2024
+% Last editied: 6/9/2025
 %
 
 %%

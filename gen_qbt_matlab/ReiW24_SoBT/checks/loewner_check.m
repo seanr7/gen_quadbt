@@ -527,7 +527,7 @@ else
 end
 
 %% 3. Velocity outputs.
-fprintf(1, '3a. VELOCITY OUTPUTS (Rayleigh damped).\n')
+fprintf(1, '3. VELOCITY OUTPUTS (Rayleigh damped).\n')
 fprintf(1, '----------------------------------------------\n')
 
 %% Problem data.
@@ -770,9 +770,125 @@ else
     fprintf(1, '---------------------------------------\n')
 end
 
-%%
-fprintf(1, '3b. VELOCITY OUTPUTS (Structurally damped).\n')
+%% 4. Hermite.
+fprintf(1, '4. HERMITE LOEWNER MATRICES (Rayleigh damped).\n')
 fprintf(1, '----------------------------------------------\n')
+
+%% Problem data.
+fprintf(1, 'Loading butterfly gyroscope benchmark problem.\n')
+fprintf(1, '----------------------------------------------\n')
+
+% From: https://morwiki.mpi-magdeburg.mpg.de/morwiki/index.php/Butterfly_Gyroscope
+% Rayleigh Damping: D = alpha*M + beta*K
+%   alpha = 0;
+%   beta  = 1e-6;
+load('data/Butterfly.mat')
+
+% Rayleigh damping coefficients.
+alpha = 0;
+beta  = 1e-6;
+
+% Symmetric system, second-order Hermite Loewner matrices.
+
+% Cp models average displacement of electrode 1 in x-, y-, and
+% z-directions; input matrix is taken to be Cp'.
+Cp          = spalloc(1, n, 3); 
+Cp(1, 3295) = 1/n;
+Cp(1, 3296) = 1/n;
+Cp(1, 3297) = 1/n;
+B           = Cp';
+p           = 1;
+
+% Recompute nodes. 
+% Prepare quadrature weights and nodes according to Trapezoidal rule.
+[nodesLeft, weightsLeft, nodesRight, weightsRight] = trapezoidal_rule([a, b], ...
+    nNodes, false);
+
+% Left, right nodes are equal.
+nodes   = nodesLeft;
+weights = weightsLeft;
+
+% Put into complex conjugate pairs to make reduced-order model matrices
+% real valued. 
+[nodes, I] = sort(nodes, 'ascend');    
+weights    = weights(I);
+
+
+fprintf(1, 'LOADING PRECOMPUTED TRANSFER FUNCTION DATA.\n')
+fprintf(1, '-------------------------------------------\n')
+load('results/butterfly_deriv_samples_N200_1e4to1e6.mat', 'Gs' ,'GsDeriv')
+
+fprintf(1, 'BUILDING HERMITE LOEWNER MATRICES (soQuadBT).\n')
+fprintf(1, '--------------------------------------\n')
+timeLoewner = tic;
+
+% Loewner matrices.
+[Mbar_soQuadBT, ~, Kbar_soQuadBT, Bbar_soQuadBT, CpBar_soQuadBT] = ...
+    so_hermite_loewner_factory(nodes, weights, Gs, GsDeriv, 'Rayleigh', [alpha, beta]);
+fprintf(1, 'CONSTRUCTION OF LOEWNER MATRICES FINISHED IN %.2f s\n', toc(timeLoewner))
+fprintf(1, '------------------------------------------------------\n')
+
+% Make it real-valued.
+Jp = zeros(nNodes*p, nNodes*p);
+Jm = zeros(nNodes*m, nNodes*m);
+Ip = eye(p, p);
+for i = 1:nNodes/2
+    Jp(1 + 2*(i - 1)*p:2*i*p, 1 + 2*(i - 1)*p:2*i*p) = 1/sqrt(2)*[Ip, -1i*Ip; Ip, 1i*Ip];
+    Jm(1 + 2*(i - 1):2*i,   1 + 2*(i - 1):2*i)       = 1/sqrt(2)*[1,  -1i;    1,  1i];
+end
+
+Mbar_soQuadBT = Jp'*Mbar_soQuadBT*Jm; Kbar_soQuadBT  = Jp'*Kbar_soQuadBT*Jm;   
+Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);  
+Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
+Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
+Dbar_soQuadBT = alpha*Mbar_soQuadBT + beta*Kbar_soQuadBT;
+
+checkLoewner = true;
+% checkLoewner = false;
+if checkLoewner
+    fprintf(1, 'Sanity check: Verify that the build of the Loewner matrices is correct (soQuadBT).\n')
+    fprintf(1, '------------------------------------------------------------------------------------------\n')
+    
+    % Quadrature-based square root factors.
+    timeFactors     = tic;
+    leftObsvFactor  = zeros(n, nNodes*p);
+    rightContFactor = zeros(n, nNodes*m);
+    fprintf(1, 'COMPUTING APPROXIMATE SQUARE-ROOT FACTORS.\n')
+    fprintf(1, '------------------------------------------\n')
+    for k = 1:nNodes
+        solveTime = tic;
+        fprintf(1, 'Linear solves %d of %d.\n', k, nNodes)
+        fprintf(1, '-----------------------------\n');
+        % For (position) controllability Gramian.
+        rightContFactor(:, (k - 1)*m + 1:k*m) = weights(k)*(((nodes(k)^2.*M ...
+            + nodes(k).*D + K)\B));
+    
+        % For (velocity) observability Gramian.
+        leftObsvFactor(:, (k - 1)*p + 1:k*p)  = conj(weights(k))*(((conj(nodes(k))^2.*M' ...
+            + conj(nodes(k)).*D' + K')\Cp'));
+
+        fprintf(1, 'Solves finished in %.2f s.\n', toc(solveTime))
+        fprintf(1, '-----------------------------\n');
+    end
+    fprintf(1, 'APPROXIMATE FACTORS COMPUTED IN %.2f s\n', toc(timeFactors))
+    fprintf(1, '------------------------------------------\n')
+    
+    fprintf('-----------------------------------------------------------------------------------\n')
+    fprintf('Check for Mbar  : Error || Mbar  - leftObsvFactor.H * M * rightContFactor ||_2: %.16f\n', ...
+        norm(Jp'*leftObsvFactor'*M*rightContFactor*Jm - Mbar_soQuadBT, 2))
+    fprintf('Check for Dbar  : Error || Dbar  - leftObsvFactor.H * D * rightContFactor ||_2: %.16f\n', ...
+        norm(Jp'*leftObsvFactor'*D*rightContFactor*Jm - Dbar_soQuadBT, 2))
+    fprintf('Check for Kbar  : Error || Kbar  - leftObsvFactor.H * K * rightContFactor ||_2: %.16f\n', ...
+        norm(Jp'*leftObsvFactor'*K*rightContFactor*Jm - Kbar_soQuadBT, 2))
+    fprintf('Check for Bbar  : Error || Bbar  - leftObsvFactor.H * B                   ||_2: %.16f\n', ...
+        norm(Jp'*leftObsvFactor'*B - Bbar_soQuadBT, 2))
+    fprintf('Check for CpBar : Error || CpBar - Cp * rightContFactor                   ||_2: %.16f\n', ...
+        norm(Cp*rightContFactor*Jm - CpBar_soQuadBT, 2))
+    fprintf('-----------------------------------------------------------------------------------\n')
+else
+    fprintf(1, 'Not verifying Loewner build; moving on.\n')
+    fprintf(1, '---------------------------------------\n')
+end
 
 
 %% Finished script.
