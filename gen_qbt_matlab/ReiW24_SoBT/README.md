@@ -1,4 +1,4 @@
-Code, Data and Results for Numerical Experiments in "Data-driven 
+Code, Data, and Results for Numerical Experiments in "Data-driven 
 balanced truncation for second-order systems with generalized proportional 
 damping"
 ===========================================================================
@@ -62,6 +62,12 @@ See [COPYING](COPYING) for a copy of the license.
 
 The files in `results` are licensed under the CC-BY 4.0 License.
 See [COPYING_DATA](COPYING_DATA) for a copy of the license.
+
+The `Butterfly.mat` file in `data` is licensed under the copyright holder
+MORwiki.
+
+The `soplateTVA.mat` file is licensed under the CC BY-4.0 License with 
+copyright holders Quirin Aumann and Steffen W. R. Werner.
 
 ## Citation
 
