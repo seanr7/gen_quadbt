@@ -39,7 +39,7 @@ function [nodesLeft, weightsLeft, nodesRight, weightsRight] = ...
 % License: BSD 2-Clause license (see COPYING)
 %
 % Virginia Tech, USA
-% Last editied: 7/16/2024
+% Last editied: 6/11/2025
 %
 
 %%

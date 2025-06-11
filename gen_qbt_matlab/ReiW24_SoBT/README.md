@@ -3,7 +3,7 @@ balanced truncation for second-order systems with generalized proportional
 damping"
 ===========================================================================
 
-This archive contains the companion codes, data and computed results for 
+This archive contains the companion codes, data, and computed results for 
 the paper:
 
 S. Reiter, S. W. R. Werner; "Data-driven 
@@ -69,7 +69,7 @@ See [COPYING_DATA](COPYING_DATA) for a copy of the license.
 ### DOI
 
 The DOI for version 1.0 is
-[10.5281/zenodo.1157038](https://doi.org/10.5281/zenodo.1157038).
+[10.5281/zenodo.15642589](https://doi.org/10.5281/zenodo.15642589).
 
 
 ### Cite as
@@ -77,7 +77,7 @@ The DOI for version 1.0 is
 S. Reiter and S. W. R. Werner. Code, data and results for numerical 
 experiments in "Data-driven balanced truncation for second-order systems 
 with generalized proportional damping" (version 1.0), June 2025. 
-doi:10.5281/zenodo.1157038
+doi:10.5281/zenodo.15642589
 
 
 ### BibTeX
@@ -90,6 +90,6 @@ doi:10.5281/zenodo.1157038
                   with generalized proportional damping'' (version 1.0)},
   month  =       jun,
   year   =       {2025},
-  doi    =       {10.5281/zenodo.1157038}
+  doi    =       {10.5281/zenodo.15642589}
 }
 ````

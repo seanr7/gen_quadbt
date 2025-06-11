@@ -955,7 +955,7 @@ for r = 10:2:rMax
     Cpr_soQuadBT_singleOut = CpBar_soQuadBT_singleOut*(Y_soQuadBT(:, 1:r)*S_soQuadBT(1:r, 1:r)^(-1/2));
     Br_soQuadBT_singleOut  = (S_soQuadBT(1:r, 1:r)^(-1/2)*Z_soQuadBT(:, 1:r)')*Bbar_soQuadBT_singleOut;
 
-    Efor = [eye(r, r), zeros(r, r); zeros(r, r), Mr_soQuadBT_singleOut];    % Descriptor matrix; Efo = [I, 0: 0, M]
+    Efor = [eye(r, r), zeros(r, r); zeros(r, r), Mr_soQuadBT_singleOut];              % Descriptor matrix; Efo = [I, 0: 0, M]
     Afor = [zeros(r, r), eye(r, r); -Kr_soQuadBT_singleOut, - Dr_soQuadBT_singleOut]; % Afo = [0, I; -K, -D]
 
     % Compute all eigs to validate stability via linearized problem. 
