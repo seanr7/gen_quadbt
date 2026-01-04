@@ -77,7 +77,7 @@ weightsRight         = weightsRight(Iright);
 r = 10;
 
 % Transfer function data.
-recomputeSamples = true;
+recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -130,7 +130,7 @@ Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);
 Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
 Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -175,7 +175,7 @@ Mbar_soLoewner = real(Mbar_soLoewner);  Kbar_soLoewner  = real(Kbar_soLoewner);
 Bbar_soLoewner = Jp'*Bbar_soLoewner;    CpBar_soLoewner = CpBar_soLoewner*Jm;
 Bbar_soLoewner = real(Bbar_soLoewner);  CpBar_soLoewner = real(CpBar_soLoewner);
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soLoewner).\n')
     fprintf(1, '--------------------------------------\n')
@@ -220,7 +220,7 @@ Ebar_foQuadBT = real(Ebar_foQuadBT);  Abar_foQuadBT = real(Abar_foQuadBT);
 Bbar_foQuadBT = Jp'*Bbar_foQuadBT;    Cbar_foQuadBT = Cbar_foQuadBT*Jm;
 Bbar_foQuadBT = real(Bbar_foQuadBT);  Cbar_foQuadBT = real(Cbar_foQuadBT);
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -249,7 +249,7 @@ end
 
 % Intrusive methods.
 %% 4. soBT.
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -290,7 +290,7 @@ else
 end
 
 %% 5. foBt.
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -379,7 +379,7 @@ absSVError_foBT        = zeros(numSamples, 1); % Abs. SV error due to (intrusive
 absFrobError_foBT      = zeros(numSamples, 1); % Abs. Frob. error due to (intrusive) foBT reduced model
 
 % Full-order simulation data.
-recompute = true;
+recompute = false;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
@@ -522,7 +522,7 @@ fprintf(1, '------------------------------------------------------------\n')
 %% 
 % Options for paricle swarm.
 rng default
-ps_options = optimoptions('particleswarm', 'SwarmSize', 20, 'Display', 'iter', ...
+ps_options = optimoptions('particleswarm', 'SwarmSize', 10, 'Display', 'iter', ...
     'FunctionTolerance', 1e-10, 'MaxStallIterations', 30);
 
 % Two different search regions.
@@ -614,10 +614,10 @@ initDampingParams1_post = optDampingParams1;
 initDampingParams2_post = optDampingParams2;
 
 % Instantiate objective function to pass to solver. 
-objFunc_post1 = @(dampingParams) rayleigh_damping_obj(dampingParams, [nodesLeft; nodesRight], ...
+objFunc_post1 = @(dampingParams) rayleigh_damping_obj_grads(dampingParams, [nodesLeft; nodesRight], ...
     [cat(3, GsLeft, GsRight)], Kr_soQuadBT_optParams1, Br_soQuadBT_optParams1, ...
     Cpr_soQuadBT_optParams1, zeros(p, r));
-objFunc_post2 = @(dampingParams) rayleigh_damping_obj(dampingParams, [nodesLeft; nodesRight], ...
+objFunc_post2 = @(dampingParams) rayleigh_damping_obj_grads(dampingParams, [nodesLeft; nodesRight], ...
     [cat(3, GsLeft, GsRight)], Kr_soQuadBT_optParams2, Br_soQuadBT_optParams2, ...
     Cpr_soQuadBT_optParams2, zeros(p, r));
 
@@ -740,7 +740,7 @@ weights    = weights(I);
 r = 20;
 
 % Transfer function derivatives.
-recomputeSamples = true;
+recomputeSamples = false;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -801,7 +801,7 @@ Mbar_soQuadBT_singleOut = real(Mbar_soQuadBT_singleOut);  Kbar_soQuadBT_singleOu
 Bbar_soQuadBT_singleOut = Jp'*Bbar_soQuadBT_singleOut;    CpBar_soQuadBT_singleOut = CpBar_soQuadBT_singleOut*Jm;
 Bbar_soQuadBT_singleOut = real(Bbar_soQuadBT_singleOut);  CpBar_soQuadBT_singleOut = real(CpBar_soQuadBT_singleOut);
 
-recomputeModel = true;
+recomputeModel = false;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -883,7 +883,7 @@ resp_soQuadBT_Hermite       = zeros(numSamples, 1); % Response of soQuadBT reduc
 relSVError_soQuadBT_Hermite = zeros(numSamples, 1); % Error due to soQuadBT reduced model with Hermite Loewner matrices
 
 % Recompute full-order simulation data for new output.
-recompute = true;
+recompute = false;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
