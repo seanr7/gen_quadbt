@@ -54,7 +54,6 @@ function [EBAR, ABAR, BBAR, CBAR] = fo_loewner_factory(leftPoints,  rightPoints,
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)
 %
-% Virginia Tech, USA
 % Last editied: 6/9/2025
 %
 

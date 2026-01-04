@@ -67,7 +67,6 @@ function [MBAR, DBAR, KBAR, BBAR, CBAR] = so_hermite_loewner_factory(points, ...
 % All rights reserved.
 % License: BSD 2-Clause license (see COPYING)
 %
-% Virginia Tech, USA
 % Last editied: 6/11/2025
 %
 

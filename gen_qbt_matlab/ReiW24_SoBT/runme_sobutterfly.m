@@ -77,7 +77,7 @@ weightsRight         = weightsRight(Iright);
 r = 10;
 
 % Transfer function data.
-recomputeSamples = false;
+recomputeSamples = true;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -130,7 +130,7 @@ Mbar_soQuadBT = real(Mbar_soQuadBT);  Kbar_soQuadBT  = real(Kbar_soQuadBT);
 Bbar_soQuadBT = Jp'*Bbar_soQuadBT;    CpBar_soQuadBT = CpBar_soQuadBT*Jm;
 Bbar_soQuadBT = real(Bbar_soQuadBT);  CpBar_soQuadBT = real(CpBar_soQuadBT);
 
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -175,7 +175,7 @@ Mbar_soLoewner = real(Mbar_soLoewner);  Kbar_soLoewner  = real(Kbar_soLoewner);
 Bbar_soLoewner = Jp'*Bbar_soLoewner;    CpBar_soLoewner = CpBar_soLoewner*Jm;
 Bbar_soLoewner = real(Bbar_soLoewner);  CpBar_soLoewner = real(CpBar_soLoewner);
 
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soLoewner).\n')
     fprintf(1, '--------------------------------------\n')
@@ -220,7 +220,7 @@ Ebar_foQuadBT = real(Ebar_foQuadBT);  Abar_foQuadBT = real(Abar_foQuadBT);
 Bbar_foQuadBT = Jp'*Bbar_foQuadBT;    Cbar_foQuadBT = Cbar_foQuadBT*Jm;
 Bbar_foQuadBT = real(Bbar_foQuadBT);  Cbar_foQuadBT = real(Cbar_foQuadBT);
 
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -249,7 +249,7 @@ end
 
 % Intrusive methods.
 %% 4. soBT.
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -290,7 +290,7 @@ else
 end
 
 %% 5. foBt.
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (foBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -379,7 +379,7 @@ absSVError_foBT        = zeros(numSamples, 1); % Abs. SV error due to (intrusive
 absFrobError_foBT      = zeros(numSamples, 1); % Abs. Frob. error due to (intrusive) foBT reduced model
 
 % Full-order simulation data.
-recompute = false;
+recompute = true;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
@@ -519,33 +519,29 @@ fprintf(1, '------------------------------------------------------------\n')
 %% Part 2.
 % Estimate damping coefficients from data.
 
-%%
-% Options for fminunc.
-options = optimoptions('fminunc', 'Display', 'iter-detailed', 'Algorithm', 'quasi-newton', ...
-    'SpecifyObjectiveGradient', true, 'OptimalityTolerance', 1e-8, 'StepTolerance', 1e-8);
+%% 
+% Options for paricle swarm.
+rng default
+ps_options = optimoptions('particleswarm', 'SwarmSize', 20, 'Display', 'iter', ...
+    'FunctionTolerance', 1e-10, 'MaxStallIterations', 30);
 
-% Test three different pairs of initial values for optimization variables.
-alpha1 = 1e-4;    beta1  = 1e-4;
-alpha2 = 0;       beta2  = 0;
-alpha3 = 1e-1;    beta3  = 1e-1;
-
-initDampingParams1 = [alpha1, beta1];
-initDampingParams2 = [alpha2, beta2];
-initDampingParams3 = [alpha3, beta3];
+% Two different search regions.
+lb1 = [0, 1e-7];     ub1 = [1e-8, 1e-5];
+lb2 = [0, 1e-8];     ub2 = [1e-8, 1e-4];
 
 % Instantiate objective function to pass to solver. 
-objFunc = @(dampingParams) rayleigh_damping_obj(dampingParams, [nodesLeft; nodesRight], ...
-    [cat(3, GsLeft, GsRight)], Kr_soQuadBT, Br_soQuadBT, Cpr_soQuadBT, zeros(p, r));
+objFunc = @(dampingParams) rayleigh_damping_obj(dampingParams, nodesLeft, nodesRight,...
+    weightsLeft, weightsRight, GsLeft, GsRight, r);
 
 % Minimizer.
-optDampingParams1 = fminunc(objFunc, initDampingParams1, options);
-optDampingParams2 = fminunc(objFunc, initDampingParams2, options);
-optDampingParams3 = fminunc(objFunc, initDampingParams3, options);
+[optDampingParams1, ~, ~, output1, points1] = particleswarm(objFunc, ...
+    2, lb1, ub1, ps_options);
+[optDampingParams2, ~, ~, output2, points2] = particleswarm(objFunc, ...
+    2, lb2, ub2, ps_options);
 
 % Found parameters.
 optAlpha1 = optDampingParams1(1); optBeta1 = optDampingParams1(2);
 optAlpha2 = optDampingParams2(1); optBeta2 = optDampingParams2(2);
-optAlpha3 = optDampingParams3(1); optBeta3 = optDampingParams3(2);
 
 fprintf(1, 'FOUND DAMPING PARAMETERS (Initialization 1).\n')
 fprintf(1, 'optAlpha1          : %.16f\n', optAlpha1)
@@ -565,25 +561,81 @@ fprintf(1, '|alpha - optAlpha2|: %.16f\n', abs(alpha - optAlpha2))
 fprintf(1, '|beta  - optbeta2 |: %.16f\n', abs(beta  - optBeta2))
 fprintf(1, '--------------------------------------------------------\n')
 
-fprintf(1, 'FOUND DAMPING PARAMETERS (Initialization 3).\n')
-fprintf(1, 'optAlpha3          : %.16f\n', optAlpha3)
-fprintf(1, 'optbeta3           : %.16f\n', optBeta3)
-fprintf(1, '--------------------------------------------------------\n')
-fprintf(1, 'DIFFERENCE IN FOUND DAMPING PARAMETERS COMPARED TO TRUE (Initialization 3).\n')
-fprintf(1, '|alpha - optAlpha3|: %.16f\n', abs(alpha - optAlpha3))
-fprintf(1, '|beta  - optbeta3 |: %.16f\n', abs(beta  - optBeta3))
-fprintf(1, '--------------------------------------------------------\n')
+% Recompute reduced-models using estimated parameters.
+% Loewner matrices.
+[Mbar_soQuadBT_optParams1, ~, Kbar_soQuadBT_optParams1, Bbar_soQuadBT_optParams1, CpBar_soQuadBT_optParams1] = ...
+    so_loewner_factory(nodesLeft, nodesRight, weightsLeft, weightsRight, GsLeft, ...
+                       GsRight, 'Rayleigh', [optAlpha1, optBeta1], 'Position');
+[Mbar_soQuadBT_optParams2, ~, Kbar_soQuadBT_optParams2, Bbar_soQuadBT_optParams2, CpBar_soQuadBT_optParams2] = ...
+    so_loewner_factory(nodesLeft, nodesRight, weightsLeft, weightsRight, GsLeft, ...
+                       GsRight, 'Rayleigh', [optAlpha2, optBeta2], 'Position');
 
-% Damping with inferred parameters. 
-Dr_soQuadBT_optParams1 = optAlpha1*Mr_soQuadBT + optBeta1*Kr_soQuadBT;
-Dr_soQuadBT_optParams2 = optAlpha2*Mr_soQuadBT + optBeta2*Kr_soQuadBT;
-Dr_soQuadBT_optParams3 = optAlpha3*Mr_soQuadBT + optBeta3*Kr_soQuadBT;
+% Make it real-valued.
+Jp = zeros(nNodes*p, nNodes*p);
+Jm = zeros(nNodes*m, nNodes*m);
+Ip = eye(p, p);
+for i = 1:nNodes/2
+    Jp(1 + 2*(i - 1)*p:2*i*p, 1 + 2*(i - 1)*p:2*i*p) = 1/sqrt(2)*[Ip, -1i*Ip; Ip, 1i*Ip];
+    Jm(1 + 2*(i - 1):2*i,   1 + 2*(i - 1):2*i)       = 1/sqrt(2)*[1,  -1i;    1,  1i];
+end
+
+Mbar_soQuadBT_optParams1 = Jp'*Mbar_soQuadBT_optParams1*Jm; Kbar_soQuadBT_optParams1  = Jp'*Kbar_soQuadBT_optParams1*Jm;   
+Mbar_soQuadBT_optParams1 = real(Mbar_soQuadBT_optParams1);  Kbar_soQuadBT_optParams1  = real(Kbar_soQuadBT_optParams1);  
+Bbar_soQuadBT_optParams1 = Jp'*Bbar_soQuadBT_optParams1;    CpBar_soQuadBT_optParams1 = CpBar_soQuadBT_optParams1*Jm;
+Bbar_soQuadBT_optParams1 = real(Bbar_soQuadBT_optParams1);  CpBar_soQuadBT_optParams1 = real(CpBar_soQuadBT_optParams1);
+
+Mbar_soQuadBT_optParams2 = Jp'*Mbar_soQuadBT_optParams2*Jm; Kbar_soQuadBT_optParams2  = Jp'*Kbar_soQuadBT_optParams2*Jm;   
+Mbar_soQuadBT_optParams2 = real(Mbar_soQuadBT_optParams2);  Kbar_soQuadBT_optParams2  = real(Kbar_soQuadBT_optParams2);  
+Bbar_soQuadBT_optParams2 = Jp'*Bbar_soQuadBT_optParams2;    CpBar_soQuadBT_optParams2 = CpBar_soQuadBT_optParams2*Jm;
+Bbar_soQuadBT_optParams2 = real(Bbar_soQuadBT_optParams2);  CpBar_soQuadBT_optParams2 = real(CpBar_soQuadBT_optParams2);
+% Reductor.
+[Z_soQuadBT_optParams1, S_soQuadBT_optParams1, Y_soQuadBT_optParams1] = svd(Mbar_soQuadBT_optParams1);
+[Z_soQuadBT_optParams2, S_soQuadBT_optParams2, Y_soQuadBT_optParams2] = svd(Mbar_soQuadBT_optParams2);
+
+% Reduced model matrices.
+Mr_soQuadBT_optParams1  = eye(r, r);
+Kr_soQuadBT_optParams1  = (S_soQuadBT_optParams1(1:r, 1:r)^(-1/2)*Z_soQuadBT_optParams1(:, 1:r)')*Kbar_soQuadBT_optParams1*(Y_soQuadBT_optParams1(:, 1:r)*S_soQuadBT_optParams1(1:r, 1:r)^(-1/2));
+Cpr_soQuadBT_optParams1 = CpBar_soQuadBT_optParams1*(Y_soQuadBT_optParams1(:, 1:r)*S_soQuadBT_optParams1(1:r, 1:r)^(-1/2));
+Br_soQuadBT_optParams1  = (S_soQuadBT_optParams1(1:r, 1:r)^(-1/2)*Z_soQuadBT_optParams1(:, 1:r)')*Bbar_soQuadBT_optParams1;
+
+Mr_soQuadBT_optParams2  = eye(r, r);
+Kr_soQuadBT_optParams2  = (S_soQuadBT_optParams2(1:r, 1:r)^(-1/2)*Z_soQuadBT_optParams2(:, 1:r)')*Kbar_soQuadBT_optParams2*(Y_soQuadBT_optParams2(:, 1:r)*S_soQuadBT_optParams2(1:r, 1:r)^(-1/2));
+Cpr_soQuadBT_optParams2 = CpBar_soQuadBT_optParams2*(Y_soQuadBT_optParams2(:, 1:r)*S_soQuadBT_optParams2(1:r, 1:r)^(-1/2));
+Br_soQuadBT_optParams2  = (S_soQuadBT_optParams2(1:r, 1:r)^(-1/2)*Z_soQuadBT_optParams2(:, 1:r)')*Bbar_soQuadBT_optParams2;
+
+%% Post-processing.
+% Perform post-processing to form reduced-order damping term.
+
+% Options for fminuc.
+options = optimoptions('fminunc', 'Display', 'iter-detailed', 'Algorithm', 'quasi-newton', ...
+    'SpecifyObjectiveGradient', true, 'OptimalityTolerance', 1e-10, 'StepTolerance', 1e-10, 'FunctionTolerance', 1e-10);
+
+initDampingParams1_post = optDampingParams1;
+initDampingParams2_post = optDampingParams2;
+
+% Instantiate objective function to pass to solver. 
+objFunc_post1 = @(dampingParams) rayleigh_damping_obj(dampingParams, [nodesLeft; nodesRight], ...
+    [cat(3, GsLeft, GsRight)], Kr_soQuadBT_optParams1, Br_soQuadBT_optParams1, ...
+    Cpr_soQuadBT_optParams1, zeros(p, r));
+objFunc_post2 = @(dampingParams) rayleigh_damping_obj(dampingParams, [nodesLeft; nodesRight], ...
+    [cat(3, GsLeft, GsRight)], Kr_soQuadBT_optParams2, Br_soQuadBT_optParams2, ...
+    Cpr_soQuadBT_optParams2, zeros(p, r));
+
+optDampingParams1_post = fminunc(objFunc_post1, initDampingParams1_post, options);
+optDampingParams2_post = fminunc(objFunc_post2, initDampingParams2_post, options);
+
+% Found parameters after post-processing.
+optAlpha1_post = optDampingParams1_post(1); optBeta1_post = optDampingParams1_post(2);
+optAlpha2_post = optDampingParams1_post(1); optBeta2_post = optDampingParams2_post(2);
+
+% Damping with parameters from post-processing.. 
+Dr_soQuadBT_optParams1 = optAlpha1_post*Mr_soQuadBT_optParams1 + optBeta1_post*Kr_soQuadBT_optParams1;
+Dr_soQuadBT_optParams2 = optAlpha2_post*Mr_soQuadBT_optParams2 + optBeta2_post*Kr_soQuadBT_optParams2;
 
 %% Plot response of reduced models.
 % Transfer function evaluations.
 Gr_soQuadBT_optParams1 = zeros(p, m, numSamples);
 Gr_soQuadBT_optParams2 = zeros(p, m, numSamples);
-Gr_soQuadBT_optParams3 = zeros(p, m, numSamples);
 
 % Response and errors.
 resp_soQuadBT_optParams1       = zeros(numSamples, 1); % Response of reduced model 1
@@ -592,24 +644,18 @@ relSVError_soQuadBT_optParams1 = zeros(numSamples, 1); % Error due to reduced mo
 resp_soQuadBT_optParams2       = zeros(numSamples, 1); % Response of reduced model 2
 relSVError_soQuadBT_optParams2 = zeros(numSamples, 1); % Error due to reduced model 2
 
-resp_soQuadBT_optParams3       = zeros(numSamples, 1); % Response of reduced model 3
-relSVError_soQuadBT_optParams3 = zeros(numSamples, 1); % Error due to reduced model 3
-
 % Response of full-order and soQuadBT reduced-order already computed.
 % Compute frequency response along imaginary axis.
 for ii=1:numSamples
     % Transfer functions.
-    Gr_soQuadBT_optParams1 = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT_optParams1 + Kr_soQuadBT)\Br_soQuadBT);
-    Gr_soQuadBT_optParams2 = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT_optParams2 + Kr_soQuadBT)\Br_soQuadBT);
-    Gr_soQuadBT_optParams3 = Cpr_soQuadBT*((s(ii)^2*Mr_soQuadBT + s(ii)*Dr_soQuadBT_optParams3 + Kr_soQuadBT)\Br_soQuadBT);
+    Gr_soQuadBT_optParams1 = Cpr_soQuadBT_optParams1*((s(ii)^2*Mr_soQuadBT_optParams1 + s(ii)*Dr_soQuadBT_optParams1 + Kr_soQuadBT_optParams1)\Br_soQuadBT_optParams1);
+    Gr_soQuadBT_optParams2 = Cpr_soQuadBT_optParams2*((s(ii)^2*Mr_soQuadBT_optParams2 + s(ii)*Dr_soQuadBT_optParams2 + Kr_soQuadBT_optParams2)\Br_soQuadBT_optParams2);
 
     resp_soQuadBT_optParams1(ii) = max(svd(Gr_soQuadBT_optParams1));
     resp_soQuadBT_optParams2(ii) = max(svd(Gr_soQuadBT_optParams2));
-    resp_soQuadBT_optParams3(ii) = max(svd(Gr_soQuadBT_optParams3));
 
     relSVError_soQuadBT_optParams1(ii) = max(svd(Gfo(:, :, ii) - Gr_soQuadBT_optParams1))/GfoResp(ii);
     relSVError_soQuadBT_optParams2(ii) = max(svd(Gfo(:, :, ii) - Gr_soQuadBT_optParams2))/GfoResp(ii);
-    relSVError_soQuadBT_optParams3(ii) = max(svd(Gfo(:, :, ii) - Gr_soQuadBT_optParams3))/GfoResp(ii);
 end
 
 
@@ -633,9 +679,8 @@ if plotResponse
     loglog(imag(s), resp_soQuadBT,            '--', 'linewidth', 2, 'color', ColMat(2,:)); 
     loglog(imag(s), resp_soQuadBT_optParams1, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
     loglog(imag(s), resp_soQuadBT_optParams2, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
-    loglog(imag(s), resp_soQuadBT_optParams3, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
     leg = legend('Full-order', 'soQuadBT (true damping)', 'soQuadBT (optimal/computed damping 1)', ...
-         'soQuadBT (optimal/computed damping 2)',  'soQuadBT (optimal/computed damping 3)', ...
+         'soQuadBT (optimal/computed damping 2)', ...
          'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
@@ -647,9 +692,8 @@ if plotResponse
     loglog(imag(s), relSVError_soQuadBT,            '-o', 'linewidth', 2, 'color', ColMat(2,:)); hold on
     loglog(imag(s), relSVError_soQuadBT_optParams1, '-.', 'linewidth', 2, 'color', ColMat(3,:)); 
     loglog(imag(s), relSVError_soQuadBT_optParams2, '-.', 'linewidth', 2, 'color', ColMat(4,:)); 
-    loglog(imag(s), relSVError_soQuadBT_optParams3, '-.', 'linewidth', 2, 'color', ColMat(5,:)); 
     eg = legend('soQuadBT (true damping)', 'soQuadBT (optimal/computed damping 1)', ...
-         'soQuadBT (optimal/computed damping 2)',  'soQuadBT (optimal/computed damping 3)', ...
+         'soQuadBT (optimal/computed damping 2)', ...
          'location', 'southeast', 'orientation', 'horizontal', 'interpreter', 'latex');
     xlim([imag(s(1)), imag(s(end))])
     set(leg, 'fontsize', 10, 'interpreter', 'latex')
@@ -662,11 +706,11 @@ end
 write = true;
 if write
     magMatrix = [imag(s)', GfoResp, resp_soQuadBT, resp_soQuadBT_optParams1, ...
-        resp_soQuadBT_optParams2, resp_soQuadBT_optParams3];
+        resp_soQuadBT_optParams2];
     dlmwrite('results/butterfly_dampingOpt_r10_N200_1e4to1e6_mag.dat', magMatrix, ...
         'delimiter', '\t', 'precision', 8);
     errorMatrix = [imag(s)', relSVError_soQuadBT, relSVError_soQuadBT_optParams1, ...
-        relSVError_soQuadBT_optParams2, relSVError_soQuadBT_optParams3];
+        relSVError_soQuadBT_optParams2];
     dlmwrite('results/butterfly_dampingOpt_r10_N200_1e4to1e6_error.dat', errorMatrix, ...
         'delimiter', '\t', 'precision', 8);
 end
@@ -696,7 +740,7 @@ weights    = weights(I);
 r = 20;
 
 % Transfer function derivatives.
-recomputeSamples = false;
+recomputeSamples = true;
 if recomputeSamples
     fprintf(1, 'COMPUTING TRANSFER FUNCTION DATA.\n')
     fprintf(1, '---------------------------------\n')
@@ -757,7 +801,7 @@ Mbar_soQuadBT_singleOut = real(Mbar_soQuadBT_singleOut);  Kbar_soQuadBT_singleOu
 Bbar_soQuadBT_singleOut = Jp'*Bbar_soQuadBT_singleOut;    CpBar_soQuadBT_singleOut = CpBar_soQuadBT_singleOut*Jm;
 Bbar_soQuadBT_singleOut = real(Bbar_soQuadBT_singleOut);  CpBar_soQuadBT_singleOut = real(CpBar_soQuadBT_singleOut);
 
-recomputeModel = false;
+recomputeModel = true;
 if recomputeModel
     fprintf(1, 'COMPUTING REDUCED-ORDER MODEL (soQuadBT).\n')
     fprintf(1, '--------------------------------------\n')
@@ -839,7 +883,7 @@ resp_soQuadBT_Hermite       = zeros(numSamples, 1); % Response of soQuadBT reduc
 relSVError_soQuadBT_Hermite = zeros(numSamples, 1); % Error due to soQuadBT reduced model with Hermite Loewner matrices
 
 % Recompute full-order simulation data for new output.
-recompute = false;
+recompute = true;
 if recompute
     Gfo     = zeros(p, m, numSamples);
     GfoResp = zeros(numSamples, 1);
